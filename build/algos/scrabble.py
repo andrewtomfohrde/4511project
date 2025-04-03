@@ -290,7 +290,7 @@ class Word:
             if "#" in self.word:
                 while len(blank_tile_val) != 1:
                     blank_tile_val = input("Please enter the letter value of the blank tile: ")
-                self.word = self.word[:word.index("#")] + blank_tile_val.upper() + self.word[(word.index("#")+1):]
+                    self.word = self.word[:self.word.index("#")] + blank_tile_val.upper() + self.word[(self.word.index("#")+1):]
 
             #Reads in the board's current values under where the word that is being played will go. Raises an error if the direction is not valid.
             if self.direction == "right":
@@ -320,18 +320,19 @@ class Word:
                     print("Current_board_ltr: " + str(current_board_ltr) + ", Word: " + self.word + ", Needed_Tiles: " + needed_tiles)
                     return "The letters do not overlap correctly, please choose another word."
 
-            #If there is a blank tile, remove it's given value from the tiles needed to play the word.
-            if blank_tile_val != "":
-                needed_tiles = needed_tiles[needed_tiles.index(blank_tile_val):] + needed_tiles[:needed_tiles.index(blank_tile_val)]
-
             #Ensures that the word will be connected to other words on the playing board.
             if (round_number != 1 or (round_number == 1 and players[0] != self.player)) and current_board_ltr == " " * len(self.word):
                 print("Current_board_ltr: " + str(current_board_ltr) + ", Word: " + self.word + ", Needed_Tiles: " + needed_tiles)
                 return "Please connect the word to a previously played letter."
 
-            #Raises an error if the player does not have the correct tiles to play the word.
+        # ✅ Check if player has the required tiles (including blank tiles)
+            rack_copy = list(self.player.get_rack_str())  # e.g., ['S', 'T', 'A', 'Y', '_']
             for letter in needed_tiles:
-                if letter not in self.player.get_rack_str() or self.player.get_rack_str().count(letter) < needed_tiles.count(letter):
+                if letter in rack_copy:
+                    rack_copy.remove(letter)
+                elif '_' in rack_copy:  # Use blank tile
+                    rack_copy.remove('_')
+                else:
                     return "You do not have the tiles for this word\n"
 
             #Raises an error if the location of the word will be out of bounds.
@@ -383,76 +384,107 @@ class Word:
     def get_word(self):
         return self.word
 
+from mcts_scrabble import monte_carlo_tree_search
+from word_generator import load_dictionary, get_possible_words
+
 def turn(player, board, bag):
-    #Begins a turn, by displaying the current board, getting the information to play a turn, and creates a recursive loop to allow the next person to play.
     global round_number, players, skipped_turns
 
-    #If the number of skipped turns is less than 6 and a row, and there are either tiles in the bag, or no players have run out of tiles, play the turn.
-    #Otherwise, end the game.
     if (skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
-
-        #Displays whose turn it is, the current board, and the player's rack.
         print("\nRound " + str(round_number) + ": " + player.get_name() + "'s turn \n")
         print(board.get_board())
         print("\n" + player.get_name() + "'s Letter Rack: " + player.get_rack_str())
 
-        #Gets information in order to play a word.
-        word_to_play = input("Word to play: ")
-        location = []
-        col = input("Column number: ")
-        row = input("Row number: ")
-        if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
-            location = [-1, -1]
+        # === AI PLAYER LOGIC ===
+        if player.get_name().upper() == "AI":
+            print("[AI is thinking...]")
+
+            if "dictionary" not in globals():
+                globals()['dictionary'] = load_dictionary("dic.txt")
+
+            legal_moves = get_possible_words(board, player.rack, dictionary)
+
+            if not legal_moves:
+                print("AI has no valid moves. Skipping turn.")
+                skipped_turns += 1
+            else:
+                initial_state = {
+                    'board': board,
+                    'rack': player.rack,
+                    'legal_moves': legal_moves
+                }
+
+                best_move = monte_carlo_tree_search(initial_state, iterations=500)
+
+                word_to_play = best_move['word']
+                location = list(best_move['position'])
+                direction = best_move['direction']
+
+                print(f"AI plays: {word_to_play} at {location} going {direction}")
+
+                word = Word(word_to_play, location, player, direction, board.board_array())
+
+                if word.check_word() is True:
+                    board.place_word(word_to_play, location, direction, player)
+                    word.calculate_word_score()
+                    skipped_turns = 0
+                else:
+                    print("AI attempted invalid word. Skipping.")
+                    skipped_turns += 1
+
+        # === HUMAN PLAYER LOGIC ===
         else:
-            location = [int(row), int(col)]
-        direction = input("Direction of word (right or down): ")
-
-        word = Word(word_to_play, location, player, direction, board.board_array())
-
-        #If the first word throws an error, creates a recursive loop until the information is given correctly.
-        checked = word.check_word()
-        while checked != True:
-            print(checked)
             word_to_play = input("Word to play: ")
-            word.set_word(word_to_play)
             location = []
             col = input("Column number: ")
             row = input("Row number: ")
             if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
                 location = [-1, -1]
             else:
-                word.set_location([int(row), int(col)])
                 location = [int(row), int(col)]
             direction = input("Direction of word (right or down): ")
-            word.set_direction(direction)
+
+            word = Word(word_to_play, location, player, direction, board.board_array())
+
             checked = word.check_word()
+            while checked != True:
+                print(checked)
+                word_to_play = input("Word to play: ")
+                word.set_word(word_to_play)
+                col = input("Column number: ")
+                row = input("Row number: ")
+                if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
+                    location = [-1, -1]
+                else:
+                    location = [int(row), int(col)]
+                word.set_location(location)
+                direction = input("Direction of word (right or down): ")
+                word.set_direction(direction)
+                checked = word.check_word()
 
-        #If the user has confirmed that they would like to skip their turn, skip it.
-        #Otherwise, plays the correct word and prints the board.
-        if word.get_word() == "":
-            print("Your turn has been skipped.")
-            skipped_turns += 1
-        else:
-            board.place_word(word_to_play, location, direction, player)
-            word.calculate_word_score()
-            skipped_turns = 0
+            if word.get_word() == "":
+                print("Your turn has been skipped.")
+                skipped_turns += 1
+            else:
+                board.place_word(word_to_play, location, direction, player)
+                word.calculate_word_score()
+                skipped_turns = 0
 
-        #Prints the current player's score
         print("\n" + player.get_name() + "'s score is: " + str(player.get_score()))
 
-        #Gets the next player.
+        # Get the next player
         if players.index(player) != (len(players)-1):
             player = players[players.index(player)+1]
         else:
             player = players[0]
             round_number += 1
 
-        #Recursively calls the function in order to play the next turn.
+        # Recursive call for next turn
         turn(player, board, bag)
 
-    #If the number of skipped turns is over 6 or the bag has both run out of tiles and a player is out of tiles, end the game.
     else:
         end_game()
+
 
 def start_game():
     #Begins the game and calls the turn function.
@@ -491,3 +523,26 @@ def end_game():
         start_game()
 
 start_game()
+
+if __name__ == "__main__":
+    from word_generator import load_dictionary, get_possible_words
+
+    board = Board()
+    bag = Bag()
+    player = Player("AI")
+    player.draw_tiles(bag)
+
+    # Display the board (should be empty at first)
+    print("Initial Board:")
+    board.display()
+
+    # Load dictionary
+    dictionary = load_dictionary("dic.txt")
+
+    # Generate possible words
+    legal_moves = get_possible_words(board, player.rack, dictionary)
+
+    print(f"\nRack: {player.rack}")
+    print(f"\nFound {len(legal_moves)} possible moves.\n")
+    for move in legal_moves[:10]:  # Show just the top 10 for readability
+        print(move)
