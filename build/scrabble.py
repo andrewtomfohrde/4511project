@@ -19,7 +19,7 @@ LETTER_VALUES = {"A": 1,
                  "G": 2,
                  "H": 4,
                  "I": 1,
-                 "J": 1,
+                 "J": 8,
                  "K": 5,
                  "L": 1,
                  "M": 3,
@@ -87,7 +87,7 @@ class Bag:
         self.add_to_bag(Tile("G", LETTER_VALUES), 3)
         self.add_to_bag(Tile("H", LETTER_VALUES), 2)
         self.add_to_bag(Tile("I", LETTER_VALUES), 9)
-        self.add_to_bag(Tile("J", LETTER_VALUES), 9)
+        self.add_to_bag(Tile("J", LETTER_VALUES), 1)
         self.add_to_bag(Tile("K", LETTER_VALUES), 1)
         self.add_to_bag(Tile("L", LETTER_VALUES), 4)
         self.add_to_bag(Tile("M", LETTER_VALUES), 2)
@@ -277,7 +277,7 @@ class Word:
         word_score = 0
         global dictionary 
         if "dictionary" not in globals():
-            dictionary = open("dic.txt").read().splitlines()
+            dictionary = open('scrabbledict.txt', 'r').splitlines()
 
         current_board_ltr = ""
         needed_tiles = ""
