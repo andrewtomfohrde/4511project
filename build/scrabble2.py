@@ -43,16 +43,17 @@ class Tile:
             self.score = 0
         self.char = letter.upper() # tile itself
 
-    def get_letter(self):
-        #Returns the tile's letter (string).
-        return self.letter
+    def get_char(self):
+        #Returns what char the tile represents (ex. blank = A)
+        return self.char
 
     def get_score(self):
         #Returns the tile's score value.
         return self.score
 
-    def get_tile(self):
-        return self.tile
+    def get_letter(self):
+        #Returns the tile's actual letter
+        return self.letter
         
 class Bag:
     """
@@ -206,7 +207,7 @@ class BoardNode(object):
         # DOUBLE_LETTER_SCORE = ((0, 3), (0,11), (2,6), (2,8), (3,0), (3,7), (3,14), (6,2), (6,6), (6,8), (6,12), (7,3), (7,11), (8,2), (8,6), (8,8), (8, 12), (11,0), (11,7), (11,14), (12,6), (12,8), (14, 3), (14, 11))
         
     
-    def place_tile(self, value, tile, letter):
+    def place_tile(self, tile, letter):
         if self.occupied:
             print(f"Tile at {self.position} already occupied")
             return False
@@ -324,8 +325,7 @@ class ScrabbleBoard:
         word = word.upper()
         used_tiles = []
         
-        start_row = location[0]
-        start_col = location[1]
+        start_row, start_col = location
         
         # First check if the word contains blanks (#) and get their positions
         print(f"curr word {word}")
@@ -350,47 +350,45 @@ class ScrabbleBoard:
             # Find matching tile in player's rack
             is_blank = i in blankpos
             used_tile = None
-            
-            for tile in player.rack.rack:
-                # For blank tiles, look for '#'
-                print(f"{tile.get_letter()} from your rack is blank = {is_blank}")
-                if is_blank and tile.get_letter() == '#':
-                    used_tile = tile
-                    node.char = letter
-                    node.value = 0
-                    print(f"Using blank tile ...")
-                    break
-                # For regular tiles, look for matching letter
-                elif not is_blank and tile.get_letter() == letter:
-                    used_tile = tile
-                    break
-            
-            if not used_tile:
-                # Try to use a blank tile if regular tile not found
-                if not is_blank:
-                    for tile in player.rack.rack:
-                        if tile.get_letter() == '#':
-                            used_tile = tile
-                            is_blank = True
-                            break
+            if node is not None and node.tile is not None:
+                print("Tile already placed in previous move")
+            else:
+                for tile in player.rack.rack:
+                    # For blank tiles, look for '#'
+                    print(f"{tile.get_letter()} from your rack is blank = {is_blank}")
+                    if is_blank and tile.get_letter() == '#':
+                        used_tile = tile
+                        node.char = letter
+                        node.value = 0
+                        print(f"Using blank tile ...")
+                        break
+                    # For regular tiles, look for matching letter
+                    elif not is_blank and tile.get_letter() == letter:
+                        used_tile = tile
+                        print(f"Using actual tile ... {used_tile.get_letter()}")
+                        break
+                
+                if not used_tile:
+                    # Try to use a blank tile if regular tile not found
+                    if not is_blank:
+                        for tile in player.rack.rack:
+                            if tile.get_letter() == '#':
+                                used_tile = tile
+                                is_blank = True
+                                print(f"Using blank tile even tho u didnt say so... {used_tile}")
+                                break
             
             if used_tile:
                 used_tiles.append(used_tile)
                 print(f"Used tile: {used_tile.get_letter()}")
                 
-                # Calculate score for this tile
-                letter_score = 0 if is_blank else used_tile.get_score()
-                # Apply premium square effects
-                if node.score_multiplier == "DLS":
-                    letter_score *= 2
-                elif node.score_multiplier == "TLS":
-                    letter_score *= 3
-                
                 # Place the tile on the board
-                node.place_tile(letter_score, used_tile, letter)
+                node.place_tile(used_tile, letter)
                 print(f"value = {node.tile.get_score()}")
+
             else:
-                return False  # Failed to place word
+                print(f"failed to place (alr placed?): {node.tile.get_char()}")
+                
         
         # # Apply word multiplier
         # total_score *= word_multiplier
@@ -517,6 +515,39 @@ class Word:
             if not connects_to_existing:
                 return "Word must connect to existing tiles on the board.\n"
         
+        if self.direction == "right":
+            row, col = self.location
+            curr_tile = self.board.get_node(row, col)
+            i = 1
+            while (curr_tile.left.occupied) and (col - i >= 0):
+                curr_tile = curr_tile.left
+                i += 1
+                if not (curr_tile.left.occupied) or (col - i == 0):
+                    i = 0
+                    break
+            while (curr_tile.right.occupied) and (col + i <= 14):
+                full += curr_tile.char
+                curr_tile = curr_tile.right
+                i += 1
+            
+        else:
+            row, col = self.location
+            curr_tile = self.board.get_node(row, col)
+            i = 1
+            while (curr_tile.up.occupied) and (row - i >= 0):
+                curr_tile = curr_tile.up
+                i += 1
+                if (curr_tile.up.occupied) or (row - i == 0):
+                    i = 0
+                    break
+            while (curr_tile.down.occupied) and (row + i <= 14):
+                full += curr_tile.char
+                curr_tile = curr_tile.down
+                i += 1
+        
+        if (full != self.get_word()):
+            print("Give a valid word or ELSE")
+
         # Check main word in dictionary
         if self.word.upper() not in dictionary:
             return "Word not found in dictionary.\n"
@@ -527,21 +558,33 @@ class Word:
         # Check if player has required tiles for the main word
         required_letters = list(self.word)
         board_letters = []
+        placed_tiles = []
         
         # Identify which letters will come from the board
         if self.direction == "right":
-            for i in range(len(self.word)):
+            for i, letter in enumerate(self.word):
                 node = self.board.get_node(self.location[0], self.location[1] + i)
                 if node.occupied:
+                    print(f"Letter: {self.word[i]} already placed")
                     board_letters.append(node.char)
                     required_letters[i] = None  # Mark as provided by board
+                    placed_tiles.append(None)
+                else:
+                    print(f"Letter: {self.word[i]} needs to be placed")
+                    placed_tiles.append(((self.location[0], self.location[1] + i), self.word[i]))
         else:  # down
-            for i in range(len(self.word)):
+            for i, letter in enumerate(self.word):
                 node = self.board.get_node(self.location[0] + i, self.location[1])
                 if node.occupied:
+                    print(f"Letter: {self.word[i]} already placed")
                     board_letters.append(node.char)
                     required_letters[i] = None  # Mark as provided by board
+                    placed_tiles.append(None)
+                else:
+                    print(f"Letter: {self.word[i]} needs to be placed")
+                    placed_tiles.append(((self.location[0] + i, self.location[1]), self.word[i]))
         
+        print(placed_tiles)
         # Remove None values
         required_letters = [letter for letter in required_letters if letter is not None]
         
@@ -556,16 +599,17 @@ class Word:
         
         # Now check and validate all secondary words formed
         if self.board.get_node(7,7).occupied:
-            secondary_words = self.find_secondary_words()
-        
-            for word, _positions in secondary_words:
+            secondary_words = self.find_secondary_words(placed_tiles)
+            print(secondary_words)
+            for word in secondary_words:
                 if word not in dictionary and len(word) > 1:
-                    return f"Secondary word '{word}' not found in dictionary.\n"
+                    print(f"Secondary word '{word}' not found in dictionary.\n")
+                    return False
         
         # Everything is valid
         return True
     
-    def find_secondary_words(self):
+    def find_secondary_words(self, placed_tiles):
         """
         Find all secondary words created by the placement of the main word.
         Returns a list of tuples (word, positions) where positions is a list
@@ -575,70 +619,59 @@ class Word:
 
         # Temporarily place the word on a "virtual" board for calculation
         # Instead of making a deep copy, we'll track which positions we're placing letters
-        placed_positions = []
 
-        right_clear = False
-        left_clear = False
-        up_clear = False
-        down_clear = False
+        # right_clear = False
+        # left_clear = False
+        # up_clear = False
+        # down_clear = False
         curr_word = ""
+
+        # board_copy.place_word(self.word, self.location, self.direction, self.player)
+        # def place_word(self, word, location, direction, player):
+        row, col = self.location
         
-        if self.direction == "right":
-            row, col = self.location
-            curr_tile = self.board.get_node(row, col)
-            i = 1
-            while (curr_tile.left.occupied) and (col - i >= 0):
-                curr_tile = curr_tile.left
-                i += 1
-                if (curr_tile.left.occupied) or (col - i == 0):
-                    i = 0
-                    break
-            while (curr_tile.right.occupied) and (col + i <= 14):
-                curr_word.append(curr_tile.char)
-                curr_tile = curr_tile.right
-                i += 1
-            secondary_words.append(curr_word)
-            
-        else:
-            row, col = self.location
-            curr_tile = self.board.get_node(row, col)
-            i = 1
-            while (curr_tile.up.occupied) and (row - i >= 0):
-                curr_tile = curr_tile.up
-                i += 1
-                if (curr_tile.up.occupied) or (row - i == 0):
-                    i = 0
-                    break
-            while (curr_tile.down.occupied) and (row + i <= 14):
-                curr_word.append(curr_tile.char)
-                curr_tile = curr_tile.down
-                i += 1
-            secondary_words.append(curr_word)
-        
-        print(secondary_words)
-        if (secondary_words[0] != self.word):
-            print("Give a valid word or ELSE")
-            
-        
-        for letter in self.word:
+        print(placed_tiles[0])
+
+        for i, letter in enumerate(self.word):
+            if (placed_tiles[i]):
+                new_row, new_col = placed_tiles[i][0]
+                insert_node = self.board.get_node(new_row, new_col)
+            else:
+                new_row, new_col = -1, -1
+                insert_node = self.board.get_node(row, col)
             curr_node = self.board.get_node(row, col)
-            row = curr_node.position[0]
-            col = curr_node.position[1]
             curr_word = ""
             if self.direction == "right":
                 while curr_node.up.occupied:
                     row -= 1
-                while curr_node.down.occupied:
+                    curr_node = curr_node.up
+                while curr_node.occupied:
                     curr_tile = curr_node.char
-                    curr_word += (curr_tile)
+                    curr_word += curr_tile
+                    print(curr_word)
+                    curr_node = curr_node.down
+                    row += 1
+                    if curr_node.position == insert_node.position:
+                        curr_word += self.word[i]
+                        curr_node = curr_node.down
+                print(f"Found word added on: {curr_word}")
             secondary_words.append(curr_word)
             
-            if self.direction == "down":
+            if self.direction == "down" and placed_tiles[i]:
                 while curr_node.left.occupied:
                     row -= 1
-                while curr_node.right.occupied:
+                    curr_node = curr_node.left
+                while curr_node.occupied:
                     curr_tile = curr_node.char
-                    curr_word += (curr_tile)
+                    curr_word += curr_tile
+                    curr_node = curr_node.right
+                    row += 1
+                    if curr_node.location == insert_node.location:
+                        curr_word += self.word[i]
+                        curr_node = curr_node.right
+                print(f"Found word added on: {curr_word}")
+            
+            if len(curr_word) > 1:
                 secondary_words.append(curr_word)
                 
         return secondary_words
@@ -777,7 +810,6 @@ class Word:
     def set_blank_pos(self, pos):
         self.blank_positions = pos
     
-    
 def turn(player, board, bag):
     """
     Begins a turn, by displaying the current board, getting the information to play a turn,
@@ -847,6 +879,7 @@ def turn(player, board, bag):
                         print(f"chat {i} {blank_positions}")
                         # Adjust position if multiple blanks (earlier blanks shift positions)
                         modified_word[pos] = blank_tiles_values[i]
+                        print(blank_tiles_values)
                         # Store the positions of blanks in the modified word
                     new_word = ''.join(modified_word)
                     word.set_word(new_word)
@@ -860,6 +893,7 @@ def turn(player, board, bag):
             # Call the new place_word method with proper parameter order
             # The ScrabbleBoard.place_word expects (word, start_row, start_col, direction, player)
             word_score = word.calculate_word_score()
+            print(f"Word to place: {word_to_play}")
             success = board.place_word(word_to_play, location, direction, player)
             # word_score = word.calculate_word_score()
             if success:
