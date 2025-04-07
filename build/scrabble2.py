@@ -515,6 +515,8 @@ class Word:
             if not connects_to_existing:
                 return "Word must connect to existing tiles on the board.\n"
         
+        print(f"Where we start? {self.word} at {self.location}")
+        
         if self.direction == "right":
             row, col = self.location
             curr_tile = self.board.get_node(row, col)
@@ -522,6 +524,7 @@ class Word:
             while (curr_tile.left.occupied) and (col - i >= 0):
                 curr_tile = curr_tile.left
                 i += 1
+                print(f"Where we at: {i} and ({row, col})")
                 if not (curr_tile.left.occupied) or (col - i == 0):
                     i = 0
                     break
@@ -529,6 +532,7 @@ class Word:
                 full += curr_tile.char
                 curr_tile = curr_tile.right
                 i += 1
+                print(f"Where we at: {i} and ({row, col})")
             
         else:
             row, col = self.location
@@ -537,6 +541,7 @@ class Word:
             while (curr_tile.up.occupied) and (row - i >= 0):
                 curr_tile = curr_tile.up
                 i += 1
+                print(f"Where we at: {i} and ({row, col})")
                 if (curr_tile.up.occupied) or (row - i == 0):
                     i = 0
                     break
@@ -544,7 +549,9 @@ class Word:
                 full += curr_tile.char
                 curr_tile = curr_tile.down
                 i += 1
+                print(f"Where we at: {i} and ({row, col})")
         
+        print(f"{full}")
         if (full != self.get_word()):
             print("Give a valid word or ELSE")
 
@@ -603,80 +610,72 @@ class Word:
             print(secondary_words)
             for word in secondary_words:
                 if word not in dictionary and len(word) > 1:
-                    print(f"Secondary word '{word}' not found in dictionary.\n")
+                    print(f"Secondary word '{word}' not found in dictionary. Try again.\n")
                     return False
         
         # Everything is valid
         return True
     
-    def find_secondary_words(self, placed_tiles):
+    def find_secondary_words(self, letters_to_place):
         """
         Find all secondary words created by the placement of the main word.
         Returns a list of tuples (word, positions) where positions is a list
         of (row, col) coordinates.
         """
         secondary_words = []
-
-        # Temporarily place the word on a "virtual" board for calculation
-        # Instead of making a deep copy, we'll track which positions we're placing letters
-
-        # right_clear = False
-        # left_clear = False
-        # up_clear = False
-        # down_clear = False
         curr_word = ""
 
         # board_copy.place_word(self.word, self.location, self.direction, self.player)
         # def place_word(self, word, location, direction, player):
         row, col = self.location
         
-        print(placed_tiles[0])
+        print(letters_to_place[0])
 
-        for i, letter in enumerate(self.word):
-            if (placed_tiles[i]):
-                new_row, new_col = placed_tiles[i][0]
-                insert_node = self.board.get_node(new_row, new_col)
-            else:
-                new_row, new_col = -1, -1
-                insert_node = self.board.get_node(row, col)
-            curr_node = self.board.get_node(row, col)
-            curr_word = ""
+        for i, placed in enumerate(letters_to_place):
+            if placed is None:
+                continue  # Skip tiles that are already on the board
+
+            (row, col), letter = placed
+            word = letter  # Start with the placed letter
+            node = self.board.get_node(row, col)
+
+            # If the main word is horizontal, look vertically
             if self.direction == "right":
-                while curr_node.up.occupied:
-                    row -= 1
-                    curr_node = curr_node.up
-                while curr_node.occupied:
-                    curr_tile = curr_node.char
-                    curr_word += curr_tile
-                    print(curr_word)
-                    curr_node = curr_node.down
-                    row += 1
-                    if curr_node.position == insert_node.position:
-                        curr_word += self.word[i]
-                        curr_node = curr_node.down
+                # Look upward
+                r = row - 1
+                while r >= 0 and self.board.get_node(r, col).occupied:
+                    word = self.board.get_node(r, col).char + word
+                    r -= 1
+
+                # Look downward
+                r = row + 1
+                while r < 15 and self.board.get_node(r, col).occupied:
+                    word += self.board.get_node(r, col).char
+                    r += 1
                 print(f"Found word added on: {curr_word}")
-            secondary_words.append(curr_word)
-            
-            if self.direction == "down" and placed_tiles[i]:
-                while curr_node.left.occupied:
-                    row -= 1
-                    curr_node = curr_node.left
-                while curr_node.occupied:
-                    curr_tile = curr_node.char
-                    curr_word += curr_tile
-                    curr_node = curr_node.right
-                    row += 1
-                    if curr_node.location == insert_node.location:
-                        curr_word += self.word[i]
-                        curr_node = curr_node.right
+
+            # If the main word is vertical, look horizontally
+            elif self.direction == "down":
+                # Look left
+                c = col - 1
+                while c >= 0 and self.board.get_node(row, c).occupied:
+                    word = self.board.get_node(row, c).char + word
+                    c -= 1
+
+                # Look right
+                c = col + 1
+                while c < 15 and self.board.get_node(row, c).occupied:
+                    word += self.board.get_node(row, c).char
+                    c += 1
                 print(f"Found word added on: {curr_word}")
-            
-            if len(curr_word) > 1:
-                secondary_words.append(curr_word)
-                
+
+            # Only add if an actual secondary word was formed
+            if len(word) > 1:
+                secondary_words.append(word)
+
         return secondary_words
 
-    def calculate_word_score(self):
+    def calculate_word_score(self, letters_to_place):
         """
         Calculate the score for the main word and all secondary words.
         """
@@ -888,26 +887,26 @@ def turn(player, board, bag):
             checked = word.check_word()
             print("still in this thing? 2 ")
             
-            # If the user has confirmed that they would like to skip their turn, skip it.
-            # Otherwise, plays the correct word and prints the board.
-            # Call the new place_word method with proper parameter order
-            # The ScrabbleBoard.place_word expects (word, start_row, start_col, direction, player)
-            word_score = word.calculate_word_score()
-            print(f"Word to place: {word_to_play}")
-            success = board.place_word(word_to_play, location, direction, player)
-            # word_score = word.calculate_word_score()
-            if success:
-                # The word score calculation is now handled inside place_word method
-                # so we don't need word.calculate_word_score() anymore
-                
-                print(f"Word '{word.word}' placed for {word_score} points!")
-                player.increase_score(word_score)
-                
-            else:
-                print("Failed to place word. Please try again.")
-                # Recurse with the same player to give them another chance
-                turn(player, board, bag)
-                return
+        # If the user has confirmed that they would like to skip their turn, skip it.
+        # Otherwise, plays the correct word and prints the board.
+        # Call the new place_word method with proper parameter order
+        # The ScrabbleBoard.place_word expects (word, start_row, start_col, direction, player)
+        word_score = word.calculate_word_score()
+        print(f"Word to place: {word_to_play}")
+        success = board.place_word(word_to_play, location, direction, player)
+        # word_score = word.calculate_word_score()
+        if success:
+            # The word score calculation is now handled inside place_word method
+            # so we don't need word.calculate_word_score() anymore
+            
+            print(f"Word '{word.word}' placed for {word_score} points!")
+            player.increase_score(word_score)
+            
+        else:
+            print("Failed to place word. Please try again.")
+            # Recurse with the same player to give them another chance
+            turn(player, board, bag)
+            return
 
         # Prints the current player's score
         print("\n" + player.get_name() + "'s score is: " + str(player.get_score()))
