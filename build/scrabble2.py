@@ -364,13 +364,13 @@ class ScrabbleBoard:
                     if is_blank and tile.get_letter() == '#':
                         used_tile = tile
                         node.place_blank(used_tile.get_letter(), placed_tiles[i][1])
-                        print("Placing blank tile #\n")
+                        print("Placing blank tile #")
                         break
                     # For regular tiles, look for matching letter
                     elif not is_blank and tile.get_letter() == letter:
                         used_tile = tile
                         node.place_tile(used_tile.get_letter())
-                        print(f"Placing actual tile {used_tile.get_letter()}\n")
+                        print(f"Placing actual tile {used_tile.get_letter()}")
                         break
                 
                 if not used_tile:
@@ -380,7 +380,7 @@ class ScrabbleBoard:
                             if tile.get_letter() == '#':
                                 used_tile = tile
                                 is_blank = True
-                                print(f"Using {used_tile} to fill in gaps of your play.\n")
+                                print(f"Using {used_tile} to fill in gaps of your play.")
                                 break
             
             if used_tile:
@@ -394,7 +394,7 @@ class ScrabbleBoard:
         
         # Remove used tiles from rack
         for tile in used_tiles:
-            print(f"Removing {tile.get_letter()} from rack\n")
+            print(f"Removing {tile.get_letter()} from rack")
             player.rack.remove_from_rack(tile)
         
         # Replenish rack
