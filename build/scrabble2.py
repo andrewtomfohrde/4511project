@@ -444,7 +444,7 @@ class Word:
         """
         global round_number, players, dictionary
         if "dictionary" not in globals():
-            dictionary = open("build\\scrabbledict.txt").read().splitlines()
+            dictionary = open("scrabbledict.txt").read().splitlines()
 
         # Handle out of bounds checks
         if self.location[0] > 14 or self.location[1] > 14 or self.location[0] < 0 or self.location[1] < 0 or \
