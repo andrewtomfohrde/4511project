@@ -696,6 +696,7 @@ class Word:
         sxws = 1
         sec = False
         sec_val = 0
+        tiles_used = 0
         
         # Create a temporary board to place the word for scoring
         board = self.board
@@ -755,11 +756,16 @@ class Word:
                     if sec:
                         sec_score += sec_val
                     total_score += (sec_score * sxws)
+                tiles_used += 1
             else:
                 tile = curr_node.tile
                 letter_score = LETTER_VALUES[tile]
                 curr_score += letter_score
         total_score += (curr_score * fxws)
+        
+        if tiles_used == 7:
+            total_score += 50
+        
         return total_score
 
     def set_word(self, word):
