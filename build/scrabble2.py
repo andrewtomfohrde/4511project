@@ -924,6 +924,14 @@ def start_game():
 def end_game():
     #Forces the game to end when the bag runs out of tiles.
     global players
+    global LETTER_VALUES
+    for player in players:
+        curr_score = player.get_score()
+        for tile in player.rack.rack:
+            letter_score = LETTER_VALUES[tile]
+            curr_score -= letter_score
+        player.increase_score(-curr_score)
+
     highest_score = 0
     winning_player = ""
     for player in players:
