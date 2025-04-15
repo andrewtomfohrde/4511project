@@ -402,7 +402,7 @@ def turn(player, board, bag):
             if "dictionary" not in globals():
                 globals()['dictionary'] = load_dictionary("dic.txt")
 
-            legal_moves = get_possible_words(board, player.rack, dictionary)
+            legal_moves = get_possible_words(board, player.rack, dictionary, player)
 
             if not legal_moves:
                 print("AI has no valid moves. Skipping turn.")
@@ -411,7 +411,8 @@ def turn(player, board, bag):
                 initial_state = {
                     'board': board,
                     'rack': player.rack,
-                    'legal_moves': legal_moves
+                    'legal_moves': legal_moves,
+                    'player': player  # ← Add this
                 }
 
                 best_move = monte_carlo_tree_search(initial_state, iterations=500)

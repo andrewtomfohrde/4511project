@@ -6,37 +6,48 @@ def load_dictionary(file_path="dic.txt"):
         words = set(line.strip().upper() for line in f)
     return words
 
-def get_possible_words(board, rack, dictionary):
+def get_possible_words(board, rack, dictionary, player):
     """
     Generate legal horizontal words that can be placed on the board using rack letters.
-    Only considers horizontal words and ignores bonuses for simplicity.
+    Scores are calculated using real board logic.
     """
-    legal_moves = []
-    board_size = 15  # Standard Scrabble board
+    legal_moves = get_possible_words(board, player.rack, dictionary, player)
+    board_size = 15
     anchor_points = []
 
-    # Step 1: Get board contents
     board_data = board.board_array()
 
-    # Step 2: Find anchor points (tiles already on the board)
+    # Step 1: Find anchor points (existing letters)
     for row in range(board_size):
         for col in range(board_size):
             if board_data[row][col] != "   " and board_data[row][col] not in ["TLS", "DLS", "TWS", "DWS", " * "]:
                 anchor_points.append((row, col))
 
-    # If board is empty (first move), set center as anchor
+    # Step 2: Fallback to center if empty board
     if not anchor_points:
         anchor_points = [(7, 7)]
 
-    # Step 3: Try placing words horizontally at each anchor point
+    # Step 3: Try horizontal placements at anchor points
     for row, col in anchor_points:
         for word in dictionary:
-            if can_form_word(word, rack, board_data, row, col):  # ✅ FIXED: use board_data here
+            if len(word) > 7:
+                continue  # Skip unplayable words
+
+            if col + len(word) > 15:
+                continue  # Would overflow board
+
+            temp_word = Word(word, [row, col], player, "right", board_data)
+            if temp_word.check_word() is True:
+                player.score = 0  # Reset mock scoring
+                temp_word.calculate_word_score()
+                score = player.get_score()
+                player.score = 0
+
                 move = {
                     'word': word,
-                    'score': len(word),  # Placeholder score
+                    'score': score,
                     'position': (row, col),
-                    'direction': 'horizontal'
+                    'direction': 'right'
                 }
                 legal_moves.append(move)
 

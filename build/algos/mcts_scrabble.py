@@ -17,17 +17,32 @@ class Node:
         return len(self.children) == len(self.state['legal_moves'])
 
     def best_child(self, c_param=1.4):
-        return max(self.children, key=lambda child: (
-            child.total_score / child.visits) + c_param * ((2 * (self.visits) ** 0.5) / (child.visits + 1e-4))
+        return max(
+            self.children,
+            key=lambda c: (c.total_score / (c.visits + 1e-4)) + c_param * ((2 * math.log(self.visits + 1)) / (c.visits + 1e-4))**0.5
         )
 
 def rollout(state):
-    """Simulate a random move and return the score."""
+    """Simulate placing a random legal move using game logic, and return the resulting score."""
     legal_moves = state['legal_moves']
     if not legal_moves:
         return 0
+
     move = random.choice(legal_moves)
-    return move['score']
+    temp_board = state['board']
+    temp_player = state['player']
+
+    # Create the Word object and validate the move
+    word_obj = Word(move['word'], list(move['position']), temp_player, move['direction'], temp_board.board_array())
+    if word_obj.check_word() is True:
+        # Simulate scoring
+        temp_player.score = 0
+        word_obj.calculate_word_score()
+        score = temp_player.get_score()
+        temp_player.score = 0  # Reset score after simulation
+        return score
+
+    return 0  # Invalid move
 
 def expand(node):
     """Add a new child node from the list of untried moves."""
@@ -83,7 +98,8 @@ if __name__ == "__main__":
     initial_state = {
         'board': board,
         'rack': player.rack,
-        'legal_moves': legal_moves
+        'legal_moves': legal_moves,
+        'player': player  # ← Add this
     }
 
     best_move = monte_carlo_tree_search(initial_state, iterations=500)
