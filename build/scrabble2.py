@@ -364,13 +364,13 @@ class ScrabbleBoard:
                     if is_blank and tile.get_letter() == '#':
                         used_tile = tile
                         node.place_blank(used_tile.get_letter(), placed_tiles[i][1])
-                        print("Placing blank tile #")
+                        print(f"Placing tile # as {placed_tiles[i][1]}")
                         break
                     # For regular tiles, look for matching letter
                     elif not is_blank and tile.get_letter() == letter:
                         used_tile = tile
                         node.place_tile(used_tile.get_letter())
-                        print(f"Placing actual tile {used_tile.get_letter()}")
+                        print(f"Placing tile {used_tile.get_letter()}")
                         break
                 
                 if not used_tile:
