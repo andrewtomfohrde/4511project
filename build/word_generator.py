@@ -1,48 +1,65 @@
 from itertools import permutations
+# from scrabble import Word
 
-def load_dictionary(file_path="dic.txt"):
-    """Load dictionary from file and return as a set of uppercase words."""
-    with open(file_path, 'r') as f:
-        words = set(line.strip().upper() for line in f)
-    return words
 
-def get_possible_words(board, rack, dictionary, player):
-    """
-    Generate legal horizontal words that can be placed on the board using rack letters.
-    Scores are calculated using real board logic.
-    """
-    legal_moves = get_possible_words(board, player.rack, dictionary, player)
+def load_dictionary(filename="scrabbledict.txt"):
+    with open(filename) as f:
+        return f.read().splitlines()
+
+def get_possible_words(board, rack, dictionary, player, WordClass):
+    legal_moves = []
     board_size = 15
     anchor_points = []
 
-    board_data = board.board_array()
-
-    # Step 1: Find anchor points (existing letters)
+    # Step 1: Identify anchor points (occupied tiles)
     for row in range(board_size):
         for col in range(board_size):
-            if board_data[row][col] != "   " and board_data[row][col] not in ["TLS", "DLS", "TWS", "DWS", " * "]:
+            node = board.get_node(row, col)
+            if node.occupied:
                 anchor_points.append((row, col))
 
-    # Step 2: Fallback to center if empty board
     if not anchor_points:
         anchor_points = [(7, 7)]
+
+    # Step 2: Convert rack to multiset
+    from collections import Counter
+    rack_letters = Counter([tile.get_letter() for tile in rack.get_rack_arr()])
 
     # Step 3: Try horizontal placements at anchor points
     for row, col in anchor_points:
         for word in dictionary:
-            if len(word) > 7:
-                continue  # Skip unplayable words
+            if len(word) > 7 or col + len(word) > 15:
+                continue
 
-            if col + len(word) > 15:
-                continue  # Would overflow board
+            # Estimate which tiles would need to be used from the rack
+            letters_needed = list(word)
+            for i in range(len(word)):
+                board_node = board.get_node(row, col + i)
+                if board_node and board_node.occupied and board_node.char == word[i]:
+                    letters_needed[i] = None  # already on board
 
-            temp_word = Word(word, [row, col], player, "right", board_data)
-            if temp_word.check_word() is True:
-                player.score = 0  # Reset mock scoring
-                temp_word.calculate_word_score()
-                score = player.get_score()
-                player.score = 0
+            letters_to_find = [ltr for ltr in letters_needed if ltr is not None]
+            available = rack_letters.copy()
 
+            can_make = True
+            for ltr in letters_to_find:
+                if available[ltr] > 0:
+                    available[ltr] -= 1
+                elif available["#"] > 0:  # try using a blank
+                    available["#"] -= 1
+                else:
+                    can_make = False
+                    break
+
+            if not can_make:
+                continue
+
+            # Try placement
+            test_word = WordClass(word, [row, col], player, "right", board)
+            valid, placed = test_word.check_word()
+
+            if valid:
+                score = test_word.calculate_word_score(placed)
                 move = {
                     'word': word,
                     'score': score,
@@ -52,6 +69,8 @@ def get_possible_words(board, rack, dictionary, player):
                 legal_moves.append(move)
 
     return legal_moves
+
+
 
 def can_form_word(word, rack, board_data, row, col):
     """

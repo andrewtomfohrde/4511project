@@ -3,6 +3,9 @@
 import random
 import copy
 from word_generator import load_dictionary, get_possible_words
+from scrabble import Word
+
+
 
 class Node:
     def __init__(self, state, parent=None, move=None):
