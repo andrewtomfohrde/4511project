@@ -1,6 +1,5 @@
 from random import shuffle
 import re
-import copy
 
 LETTER_VALUES = {"A": 1,
                  "B": 3,
