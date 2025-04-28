@@ -1,6 +1,5 @@
 from random import shuffle
 import re
-import copy
 
 LETTER_VALUES = {"A": 1,
                  "B": 3,
@@ -381,7 +380,7 @@ class ScrabbleBoard:
                             if tile.get_letter() == '#':
                                 used_tile = tile
                                 is_blank = True
-                                print(f"Using {used_tile} to fill in gaps of your play.\n")
+                                print(f"Using {used_tile} to fill in gaps of your play.")
                                 break
             
             if used_tile:
@@ -446,7 +445,7 @@ class Word:
         global round_number, players, dictionary
         if "dictionary" not in globals():
             dictionary = open("build/scrabbledict.txt").read().splitlines()
-
+            
         # Handle out of bounds checks
         if self.location[0] > 14 or self.location[1] > 14 or self.location[0] < 0 or self.location[1] < 0 or \
         (self.direction == "down" and (self.location[0] + len(self.word) - 1) > 14) or \
@@ -697,6 +696,7 @@ class Word:
         sxws = 1
         sec = False
         sec_val = 0
+        tiles_used = 0
         
         # Create a temporary board to place the word for scoring
         board = self.board
@@ -755,12 +755,19 @@ class Word:
                         curr_node = curr_node.right
                     if sec:
                         sec_score += sec_val
-                    total_score += sec_score
+                    total_score += (sec_score * sxws)
+                tiles_used += 1
+                
             else:
                 tile = curr_node.tile
                 letter_score = LETTER_VALUES[tile]
                 curr_score += letter_score
-        total_score += curr_score * fxws
+
+        total_score += (curr_score * fxws)
+        
+        if tiles_used == 7:
+            total_score += 50
+
         return total_score
 
     def set_word(self, word):
@@ -919,6 +926,14 @@ def start_game():
 def end_game():
     #Forces the game to end when the bag runs out of tiles.
     global players
+    global LETTER_VALUES
+    for player in players:
+        curr_score = player.get_score()
+        for tile in player.rack.rack:
+            letter_score = LETTER_VALUES[tile]
+            curr_score -= letter_score
+        player.increase_score(-curr_score)
+
     highest_score = 0
     winning_player = ""
     for player in players:
