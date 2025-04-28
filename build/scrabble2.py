@@ -100,7 +100,7 @@ class Bag:
         self.add_to_bag(Tile("X", LETTER_VALUES), 1)
         self.add_to_bag(Tile("Y", LETTER_VALUES), 2)
         self.add_to_bag(Tile("Z", LETTER_VALUES), 1)
-        self.add_to_bag(Tile("#", LETTER_VALUES), 2)
+        self.add_to_bag(Tile("#", LETTER_VALUES), 80)
         shuffle(self.bag)
 
     def take_from_bag(self):
@@ -209,7 +209,7 @@ class BoardNode(object):
     
     def place_tile(self, tile):
         if self.occupied:
-            print(f"Tile at {self.position} already occupied\n")
+            print(f"Tile at {self.position} already occupied")
             return False
         self.tile = tile
         self.char = tile
@@ -217,7 +217,7 @@ class BoardNode(object):
         
     def place_blank(self, tile, char):
         if self.occupied:
-            print(f"Tile at {self.position} already occupied\n")
+            print(f"Tile at {self.position} already occupied")
             return False
         self.tile = tile
         self.char = char
@@ -226,7 +226,7 @@ class BoardNode(object):
     def get_display_str(self):
         """Return a string representation of this cell."""
         if self.occupied:
-            return f"{self.char}/{self.tile}"
+            return f" {self.char} "
         elif self.position == (7, 7):  # Center square
             return " * "
         elif self.score_multiplier:
@@ -345,7 +345,7 @@ class ScrabbleBoard:
             elif direction == "down":  # direction == "down"
                 row += i
             else:
-                print("Give valid direction for word placement\n")
+                print("Give valid direction for word placement")
                 return False
             
             # Get the node at this position
@@ -356,7 +356,7 @@ class ScrabbleBoard:
             used_tile = None
             
             if node is not None and node.tile is not None:
-                print("Tile already placed in previous move\n")
+                print("Tile already placed in previous move")
                 
             else:
                 for tile in player.rack.rack:
@@ -380,7 +380,7 @@ class ScrabbleBoard:
                             if tile.get_letter() == '#':
                                 used_tile = tile
                                 is_blank = True
-                                print(f"Using {used_tile} to fill in gaps of your play.")
+                                print(f"Using {used_tile.tile} to fill in gaps of your play.")
                                 break
             
             if used_tile:
@@ -450,7 +450,7 @@ class Word:
         if self.location[0] > 14 or self.location[1] > 14 or self.location[0] < 0 or self.location[1] < 0 or \
         (self.direction == "down" and (self.location[0] + len(self.word) - 1) > 14) or \
         (self.direction == "right" and (self.location[1] + len(self.word) - 1) > 14):
-            print("Location out of bounds.\n")
+            print("Location out of bounds")
             return False, None
         
         # Handle blank tiles similar to original code
@@ -476,7 +476,7 @@ class Word:
                     self.location[1] <= 7 <= self.location[1] + len(self.word) - 1) or
                     (self.direction == "down" and self.location[1] == 7 and 
                     self.location[0] <= 7 <= self.location[0] + len(self.word) - 1)):
-                print("First word must cover the center star.\n")
+                print("First word must cover the center star.")
                 return False, None
         
         # For subsequent words, check if the placement touches existing tiles
@@ -514,7 +514,7 @@ class Word:
                         break
             
             if not connects_to_existing:
-                print("Word must connect to existing tiles on the board.\n")
+                print("Word must connect to existing tiles on the board.")
                 return False, None
                 
         if self.direction == "right":
@@ -548,7 +548,7 @@ class Word:
                 if (not curr_tile.up.occupied) or (row - i == 0):
                     break
             i = 0
-            while ((curr_tile.down.occupied) or (curr_tile.position == (row + i, col))) and (row + i <= 14):
+            while ((curr_tile.down and curr_tile.down.occupied) or (curr_tile.position == (row + i, col))) and (row + i <= 14):
                 if curr_tile.position == (row + i, col) and len(self.word) > i:
                     full += self.word[i]
                 elif (curr_tile.down.occupied):
@@ -560,12 +560,12 @@ class Word:
                 i += 1
         
         if (full != self.get_word()):
-            print("Invalid word. Give a playable word.\n")
+            print("Invalid word. Give a playable word.")
             return False, None
 
         # Check main word in dictionary
         if self.word.upper() not in dictionary:
-            print("Word not found in dictionary.\n")
+            print("Word not found in dictionary.")
             return False, None
         
         # Get letters from player's rack that can be used
@@ -614,7 +614,7 @@ class Word:
             elif '#' in available_letters:  # Use a blank tile
                 available_letters.remove('#')
             else:
-                print(f"You don't have the required tiles to spell {self.word}.\n")
+                print(f"You don't have the required tiles to spell {self.word}.")
                 return False, None
         
         # Now check and validate all secondary words formed
@@ -622,7 +622,7 @@ class Word:
             secondary_words = self.find_secondary_words(place_tiles)
             for word in secondary_words:
                 if word not in dictionary and len(word) > 1:
-                    print(f"Secondary word '{word}' not found in dictionary. Try again.\n")
+                    print(f"Secondary word '{word}' not found in dictionary. Try again.")
                     return False, place_tiles
         
         # Everything is valid
