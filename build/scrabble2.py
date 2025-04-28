@@ -365,13 +365,13 @@ class ScrabbleBoard:
                     if is_blank and tile.get_letter() == '#':
                         used_tile = tile
                         node.place_blank(used_tile.get_letter(), placed_tiles[i][1])
-                        print("Placing blank tile #\n")
+                        print("Placing blank tile #")
                         break
                     # For regular tiles, look for matching letter
                     elif not is_blank and tile.get_letter() == letter:
                         used_tile = tile
                         node.place_tile(used_tile.get_letter())
-                        print(f"Placing actual tile {used_tile.get_letter()}\n")
+                        print(f"Placing actual tile {used_tile.get_letter()}")
                         break
                 
                 if not used_tile:
@@ -395,7 +395,7 @@ class ScrabbleBoard:
         
         # Remove used tiles from rack
         for tile in used_tiles:
-            print(f"Removing {tile.get_letter()} from rack\n")
+            print(f"Removing {tile.get_letter()} from rack")
             player.rack.remove_from_rack(tile)
         
         # Replenish rack
@@ -445,7 +445,7 @@ class Word:
         """
         global round_number, players, dictionary
         if "dictionary" not in globals():
-            dictionary = open("build\\scrabbledict.txt").read().splitlines()
+            dictionary = open("build/scrabbledict.txt").read().splitlines()
 
         # Handle out of bounds checks
         if self.location[0] > 14 or self.location[1] > 14 or self.location[0] < 0 or self.location[1] < 0 or \
@@ -733,12 +733,12 @@ class Word:
                             sec_val = letter_score
                             curr_score += letter_score
                         else:
-                            sec_score += (letter_score * sxws)
+                            sec_score += letter_score * sxws
                             sec = True
                         curr_node = curr_node.down
                     if sec:
                         sec_score += sec_val
-                    total_score += (sec_score * sxws)
+                    total_score += sec_score
                 else:
                     while curr_node.left and curr_node.left.occupied:
                         curr_node = curr_node.left
@@ -746,21 +746,21 @@ class Word:
                         tile = curr_node.tile
                         letter_score = LETTER_VALUES[tile]
                         if curr_node.position == (row, col):
-                            sec_val = letter_score * xls
                             letter_score = letter_score * xls
+                            sec_val = letter_score * sxws
                             curr_score += letter_score
                         else:
-                            sec_score += (letter_score * sxws)
+                            sec_score += letter_score * sxws
                             sec = True
                         curr_node = curr_node.right
                     if sec:
                         sec_score += sec_val
-                    total_score += (sec_score * sxws)
+                    total_score += sec_score
             else:
                 tile = curr_node.tile
                 letter_score = LETTER_VALUES[tile]
                 curr_score += letter_score
-        total_score += (curr_score * fxws)
+        total_score += curr_score * fxws
         return total_score
 
     def set_word(self, word):
