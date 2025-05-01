@@ -1040,6 +1040,86 @@ def end_game():
 
 start_game()
 
+    # def start_game_vs_ai(self):
+    #     #Begins the game and calls the turn function.
+    #     board = ScrabbleBoard()
+    #     bag = Bag()
+    #     self.players = []
+
+    #     #Asks the player for the number of players.
+    #     valid = False
+
+    #     #Welcomes players to the game and allows players to choose their name.
+    #     print("\nWelcome to Scrabble! Please enter the names of the players below.")
+
+    #     human_player = Player(bag)
+    #     human_player.set_name(input("Please enter your name: "))
+    #     self.players.append(human_player)
+
+    #     ai_player = Player(bag)
+    #     while not valid:
+    #         ai_to_play = input("Please enter AI to be player " + str(i+1) + ": ")
+    #         if ai_to_play is "MCTS":
+    #             valid = True
+
+    #         elif ai_to_play is "Beam":
+    #             valid = True
+
+    #         elif ai_to_play is "A":
+    #             valid = True
+
+    #         elif ai_to_play is "GBFS":
+    #             valid = True
+
+    #         else:
+    #             quit = input("Invalid input. To quit, enter 'q': ").strip().lower() == 'q'
+    #             if quit:
+    #                 return
+
+    #     self.players.append(ai_player)
+
+    #     #Sets the default value of global variables.
+    #     current_player = self.players[0]
+    #     self.turn(current_player, board, bag)
+
+    # def start_ai_game(self):
+    #     #Begins the game and calls the turn function.
+    #     board = ScrabbleBoard()
+    #     bag = Bag()
+    #     self.players = []
+
+    #     #Asks the player for the number of players.
+    #     valid = False
+
+    #     #Welcomes players to the game and allows players to choose their name.
+    #     print("\nWelcome to Scrabble! Please enter the AI of each player below. Options include 'MCTS', 'Beam', 'A', 'GBFS'")
+    #     self.players = []
+    #     for i in range(2):
+    #         while not valid:
+    #             ai_to_play = input("Please enter AI to be player " + str(i+1) + ": ")
+    #             if ai_to_play is "MCTS":
+    #                 valid = True
+
+    #             elif ai_to_play is "Beam":
+    #                 valid = True
+
+    #             elif ai_to_play is "A":
+    #                 valid = True
+
+    #             elif ai_to_play is "GBFS":
+    #                 valid = True
+
+    #             else:
+    #                 quit = input("Invalid input. To quit, enter 'q': ").strip().lower() == 'q'
+    #                 if quit:
+    #                     return
+    #         self.players.append(Player(bag))
+    #         self.players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
+
+    #     #Sets the default value of global variables.
+    #     current_player = self.players[0]
+    #     self.turn(current_player, board, bag)
+
 
 if __name__ == "__main__":
     from word_generator import load_dictionary, get_possible_words
@@ -1072,7 +1152,7 @@ if __name__ == "__main__":
 
 ########################
 
-    class DAWGNode:
+class DAWGNode:
     """Node in a Directed Acyclic Word Graph"""
     
     def __init__(self):

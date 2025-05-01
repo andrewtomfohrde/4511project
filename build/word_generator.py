@@ -6,7 +6,7 @@ def load_dictionary(filename="scrabbledict.txt"):
     with open(filename) as f:
         return f.read().splitlines()
 
-def get_possible_words(board, rack, dictionary, player, WordClass):
+def get_possible_words(board, rack, dictionary, player, Word):
     legal_moves = []
     board_size = 15
     anchor_points = []
@@ -55,7 +55,7 @@ def get_possible_words(board, rack, dictionary, player, WordClass):
                 continue
 
             # Try placement
-            test_word = WordClass(word, [row, col], player, "right", board)
+            test_word = Word(word, [row, col], player, "right", board)
             valid, placed = test_word.check_word()
 
             if valid:
