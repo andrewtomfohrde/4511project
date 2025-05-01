@@ -1,6 +1,101 @@
 from random import shuffle
 import re
 
+from random import shuffle
+import re
+from word_generator import get_possible_words
+from word_generator import load_dictionary
+import math
+# from mcts_scrabble import monte_carlo_tree_search
+
+# mcts_scrabble.py
+
+import random
+import copy
+from word_generator import load_dictionary, get_possible_words
+# from scrabble import Word
+
+
+
+class MCTS:
+    def __init__(self, state, parent=None, move=None):
+        self.state = state
+        self.parent = parent
+        self.move = move  # e.g., {'word': ..., 'position': ..., 'direction': ..., 'score': ...}
+        self.children = []
+        self.visits = 0
+        self.total_score = 0
+
+    def is_fully_expanded(self):
+        return len(self.children) == len(self.state['legal_moves'])
+
+    def best_child(self, c_param=1.4):
+        return max(
+            self.children,
+            key=lambda c: (c.total_score / (c.visits + 1e-4)) + c_param * ((2 * math.log(self.visits + 1)) / (c.visits + 1e-4))**0.5
+        )
+
+def rollout(state):
+    """Simulate placing a random legal move using game logic, and return the resulting score."""
+    legal_moves = state['legal_moves']
+    if not legal_moves:
+        return 0
+
+    move = random.choice(legal_moves)
+    temp_board = state['board']
+    temp_player = state['player']
+
+    # Create the Word object and validate the move
+    
+    word_obj = Word(move['word'], list(move['position']), temp_player, move['direction'], temp_board)
+    if word_obj.check_word() is True:
+        # Simulate scoring
+        temp_player.score = 0
+        word_obj.calculate_word_score()
+        score = temp_player.get_score()
+        temp_player.score = 0  # Reset score after simulation
+        return score
+
+    return 0  # Invalid move
+
+def expand(node):
+    """Add a new child node from the list of untried moves."""
+    tried_moves = [child.move for child in node.children]
+    untried_moves = [m for m in node.state['legal_moves'] if m not in tried_moves]
+    if not untried_moves:
+        return node
+    move = random.choice(untried_moves)
+    new_state = copy.deepcopy(node.state)
+    new_state['legal_moves'].remove(move)
+    child = MCTS(new_state, parent=node, move=move)
+    node.children.append(child)
+    return child
+
+def backpropagate(node, result):
+    while node:
+        node.visits += 1
+        node.total_score += result
+        node = node.parent
+
+def monte_carlo_tree_search(initial_state, iterations=1000):
+    root = MCTS(initial_state)
+
+    for _ in range(iterations):
+        node = root
+        while node.is_fully_expanded() and node.children:
+            node = node.best_child()
+        leaf = expand(node)
+        result = rollout(leaf.state)
+        backpropagate(leaf, result)
+
+    best = max(root.children, key=lambda c: c.visits)
+    return best.move
+
+
+
+
+
+
 LETTER_VALUES = {"A": 1,
                  "B": 3,
                  "C": 3,
@@ -356,7 +451,7 @@ class ScrabbleBoard:
             used_tile = None
             
             if node is not None and node.tile is not None:
-                print("Tile already placed in previous move")
+                print("Tile already placed in previous move\n")
                 
             else:
                 for tile in player.rack.rack:
@@ -394,6 +489,7 @@ class ScrabbleBoard:
         
         # Remove used tiles from rack
         for tile in used_tiles:
+            print(f"Removing {tile.get_letter()} from rack")
             player.rack.remove_from_rack(tile)
         
         # Replenish rack
@@ -403,7 +499,7 @@ class ScrabbleBoard:
 
     def board_graph(self):
         #Returns the 2-dimensional board array.
-        return self.board
+        return board
     
     def get_node(self, row, col):
         """Get the node at the specified position."""
@@ -423,57 +519,6 @@ class ScrabbleBoard:
         
         return current
     
-    def find_anchor_points(self):
-        """Find all empty cells adjacent to placed tiles."""
-        anchor_points = set()
-        current_node = self.start_node
-        is_empty_board = True
-        
-        # Traverse the board to find anchor points
-        row_node = current_node
-        while row_node:
-            col_node = row_node
-            while col_node:
-                if col_node.occupied:
-                    is_empty_board = False
-                    break
-                col_node = col_node.right
-            if not is_empty_board:
-                break
-            row_node = row_node.down
-
-        if is_empty_board:
-            return [(7, 7)]
-        
-        row_node = current_node
-        row_index = 0
-
-        while row_node:
-            col_node = row_node
-            col_index = 0
-
-            while col_node:
-                if not col_node.occupied:
-                    adjacent_cells = [
-                        (col_node.right, "right"),
-                        (col_node.down, "down"),
-                        (col_node.left, "left"),
-                        (col_node.up, "up"),
-                    ]
-                    for adjacent_node, direction in adjacent_cells:
-                        if adjacent_node and adjacent_node.occupied:
-                            anchor_points.add((row_index, col_index))
-                            break
-                col_node = col_node.right
-                col_index += 1
-
-            row_node = row_node.down
-            row_index += 1
-
-        print(anchor_points)
-            
-        return list(anchor_points)
-
 class Word:
     """
     Class representing a word being played on the board.
@@ -492,9 +537,9 @@ class Word:
         Enhanced check_word method that validates the primary word and all
         secondary words formed by the placement.
         """
-        global dictionary
+        global round_number, players, dictionary
         if "dictionary" not in globals():
-            dictionary = open("build/scrabbledict.txt").read().splitlines()
+            dictionary = open("scrabbledict.txt").read().splitlines()
 
         # Handle out of bounds checks
         if self.location[0] > 14 or self.location[1] > 14 or self.location[0] < 0 or self.location[1] < 0 or \
@@ -839,265 +884,190 @@ class Word:
     
     def set_blank_pos(self, pos):
         self.blank_positions = pos
-
-class Game:
-    def __init__(self):
-        self.round_number = 1
-        self.players = []
-        self.skipped_turns = 0
     
-    def turn(self, player, board, bag):
-        """
-        Begins a turn, by displaying the current board, getting the information to play a turn,
-        and creates a recursive loop to allow the next person to play.
-        """
-        global word
-        placed = []
-        
-        # If the number of skipped turns is less than 6 in a row, and there are either tiles in the bag,
-        # or no players have run out of tiles, play the turn.
-        # Otherwise, end the game.
-        if (self.skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
-            
-            # Displays whose turn it is, the current board, and the player's rack.
-            print("\nRound " + str(self.round_number) + ": " + player.get_name() + "'s turn \n")
-            print(board.get_board())  # Use the new method name
-            
-            # Gets information in order to play a word.
-                # Create a Word object - but we need to adapt this for our new board implementation
-                # Instead of board.board_array(), pass the board object directly
-                
-                # If the first word throws an error, creates a recursive loop until the information is given correctly.
+def turn(player, board, bag):
+    """
+    Begins a turn, by displaying the current board, getting the information to play a turn,
+    and creates a recursive loop to allow the next person to play.
+    """
+    global round_number, players, skipped_turns, word
+
+    if (skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
+        print("\nRound " + str(round_number) + ": " + player.get_name() + "'s turn \n")
+        print(board.get_board())
+        print("\n" + player.get_name() + "'s Letter Rack: " + player.get_rack_str())
+
+        # === AI PLAYER LOGIC ===
+        if player.get_name().upper() == "AI":
+            print("[AI is thinking...]")
+
+            if "dictionary" not in globals():
+                globals()['dictionary'] = load_dictionary("scrabbledict.txt")
+
+            legal_moves = get_possible_words(board, player.rack, dictionary, player, Word)
+
+            if not legal_moves:
+                print("AI has no valid moves. Skipping turn.")
+                skipped_turns += 1
+            else:
+                initial_state = {
+                    'board': board,
+                    'rack': player.rack,
+                    'legal_moves': legal_moves,
+                    'player': player
+                }
+
+                best_move = monte_carlo_tree_search(initial_state, iterations=500)
+
+                word_to_play = best_move['word']
+                location = list(best_move['position'])
+                direction = best_move['direction']
+
+                print(f"AI plays: {word_to_play} at {location} going {direction}")
+
+                word = Word(word_to_play, location, player, direction, board)
+
+                valid, placed = word.check_word()
+                if valid:
+                    board.place_word(word_to_play, location, direction, player, placed)
+                    word_score = word.calculate_word_score(placed)
+                    print(f"Word '{word.word}' placed for {word_score} points!")
+                    player.increase_score(word_score)
+                    skipped_turns = 0
+                else:
+                    print("AI attempted invalid word. Skipping.")
+                    skipped_turns += 1
+
+        # === HUMAN PLAYER LOGIC ===
+        else:
+            placed = []
             checked = False
-            while checked == False:
+            while not checked:
                 print("\n" + player.get_name() + "'s Letter Rack: " + player.get_rack_str())
                 word_to_play = input("Word to play: ")
-                
-                if word_to_play:  # Only get location and direction if word is not empty
-                    location = []
-                    col = input("Column number: ")
-                    row = input("Row number: ")
-                    
-                    if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
-                        location = [-1, -1]
-                    else:
-                        location = [int(row), int(col)]
-                        
-                    direction = input("Direction of word (right or down): ")
-                    
-                    if word_to_play == "" and col == "" and row == "" and direction == "":
-                        print("Your turn has been skipped.")
-                        self.skipped_turns += 1
-                    
-                    word = Word(word_to_play, location, player, direction, board)
-                    
-                    blank_positions = [m.start() for m in re.finditer('#', word_to_play)]
-                    # full = "" # full in-line word; checking validity of placement / use in checkword
-                    blank_tiles_values = []
-                    
-                    
-                    if blank_positions:
-                        print(f"{len(blank_positions)} BLANK(S) DETECTED")
-                            
-                        # Get values for each blank tile
-                        for i, pos in enumerate(blank_positions):
-                            blank_value = ""
-                            blank_value = input(f"Please enter the letter value of blank tile {i+1}: ")
-                            blank_value = blank_value.upper()
-                            blank_tiles_values.append(blank_value)
-                                
-                        # Replace blanks with their values
-                        modified_word = list(word_to_play)
-                        for i, pos in enumerate(blank_positions):
-                            # Adjust position if multiple blanks (earlier blanks shift positions)
-                            modified_word[pos] = blank_tiles_values[i]
-                            # Store the positions of blanks in the modified word
-                        new_word = ''.join(modified_word)
-                        word.set_word(new_word)
+                location = []
+                col = input("Column number: ")
+                row = input("Row number: ")
+                if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
+                    location = [-1, -1]
+                else:
+                    location = [int(row), int(col)]
+                direction = input("Direction of word (right or down): ")
+
+                word = Word(word_to_play, location, player, direction, board)
+
+                blank_positions = [m.start() for m in re.finditer('#', word_to_play)]
+                blank_tiles_values = []
+                if blank_positions:
+                    print(f"{len(blank_positions)} BLANK(S) DETECTED")
+                    for i, pos in enumerate(blank_positions):
+                        blank_value = input(f"Please enter the letter value of blank tile {i+1}: ").upper()
+                        blank_tiles_values.append(blank_value)
+                    modified_word = list(word_to_play)
+                    for i, pos in enumerate(blank_positions):
+                        modified_word[pos] = blank_tiles_values[i]
+                    new_word = ''.join(modified_word)
+                    word.set_word(new_word)
 
                 checked, placed = word.check_word()
-                
-            # If the user has confirmed that they would like to skip their turn, skip it.
-            # Otherwise, plays the correct word and prints the board.
-            # Call the new place_word method with proper parameter order
-            # The ScrabbleBoard.place_word expects (word, start_row, start_col, direction, player)
+
             success = board.place_word(word_to_play, location, direction, player, placed)
             word_score = word.calculate_word_score(placed)
-            # word_score = word.calculate_word_score()
             if success:
-                # The word score calculation is now handled inside place_word method
-                # so we don't need word.calculate_word_score() anymore
-                
                 print(f"Word '{word.word}' placed for {word_score} points!")
                 player.increase_score(word_score)
-                
+                skipped_turns = 0
             else:
                 print("Failed to place word. Please try again.")
-                # Recurse with the same player to give them another chance
-                self.turn(player, board, bag)
+                turn(player, board, bag)
                 return
 
-            # Prints the current player's score
-            print("\n" + player.get_name() + "'s score is: " + str(player.get_score()))
-            
-            # Gets the next player.
-            if self.players.index(player) != (len(self.players) - 1):
-                player = self.players[self.players.index(player) + 1]
-            else:
-                player = self.players[0]
-                self.round_number += 1
-                
-            # Recursively calls the function in order to play the next turn.
-            self.turn(player, board, bag)
-            
-        # If the number of skipped turns is over 6 or the bag has both run out of tiles and a player is out of tiles, end the game.
+        print("\n" + player.get_name() + "'s score is: " + str(player.get_score()))
+
+        if players.index(player) != (len(players) - 1):
+            player = players[players.index(player) + 1]
         else:
-            self.end_game()
+            player = players[0]
+            round_number += 1
 
-    def start_game(self):
-        #Begins the game and calls the turn function.
-        board = ScrabbleBoard()
-        bag = Bag()
+        turn(player, board, bag)
+    else:
+        end_game()
 
-        #Asks the player for the number of players.
-        num_of_players = 2 # input("How many players ???? ")
+def start_game():
+    #Begins the game and calls the turn function.
+    global round_number, players, skipped_turns
+    board = ScrabbleBoard()
+    bag = Bag()
 
-        #Welcomes players to the game and allows players to choose their name.
-        print("\nWelcome to Scrabble! Please enter the names of the players below.")
-        self.players = []
-        for i in range(num_of_players):
-            self.players.append(Player(bag))
-            self.players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
+    #Asks the player for the number of players.
+    num_of_players = 2
 
-        #Sets the default value of global variables.
-        current_player = self.players[0]
-        self.turn(current_player, board, bag)
+    #Welcomes players to the game and allows players to choose their name.
+    print("\nWelcome to Scrabble! Please enter the names of the players below.")
+    players = []
+    for i in range(num_of_players):
+        players.append(Player(bag))
+        players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
 
-    def end_game(self):
-        #Forces the game to end when the bag runs out of tiles.
-        global LETTER_VALUES
-        for player in self.players:
-            curr_score = player.get_score()
-            for tile in player.rack.rack:
-                letter_score = LETTER_VALUES[tile]
-                curr_score -= letter_score
-            player.increase_score(-curr_score)
+    #Sets the default value of global variables.
+    round_number = 1
+    skipped_turns = 0
+    current_player = players[0]
+    turn(current_player, board, bag)
 
-        highest_score = 0
-        winning_player = ""
-        for player in self.players:
-            if player.get_score() > highest_score:
-                highest_score = player.get_score()
-                winning_player = player.get_name()
-        print("The game is over! " + winning_player + ", you have won!")
+def end_game():
+    #Forces the game to end when the bag runs out of tiles.
+    global players
+    global LETTER_VALUES
+    for player in players:
+        curr_score = player.get_score()
+        for tile in player.rack.rack:
+            letter_score = LETTER_VALUES[tile]
+            curr_score -= letter_score
+        player.increase_score(-curr_score)
 
-        if input("\nWould you like to play again? (y/n)").upper() == "Y":
-            self.start_game()
-    
-    def start_game_vs_ai(self):
-        #Begins the game and calls the turn function.
-        board = ScrabbleBoard()
-        bag = Bag()
-        self.players = []
+    highest_score = 0
+    winning_player = ""
+    for player in players:
+        if player.get_score > highest_score:
+            highest_score = player.get_score()
+            winning_player = player.get_name()
+    print("The game is over! " + winning_player + ", you have won!")
 
-        #Asks the player for the number of players.
-        valid = False
+    if input("\nWould you like to play again? (y/n)").upper() == "Y":
+        start_game()
 
-        #Welcomes players to the game and allows players to choose their name.
-        print("\nWelcome to Scrabble! Please enter the names of the players below.")
+start_game()
 
-        human_player = Player(bag)
-        human_player.set_name(input("Please enter your name: "))
-        self.players.append(human_player)
-
-        ai_player = Player(bag)
-        while not valid:
-            ai_to_play = input("Please enter AI to be player " + str(i+1) + ": ")
-            if ai_to_play is "MCTS":
-                valid = True
-
-            elif ai_to_play is "Beam":
-                valid = True
-
-            elif ai_to_play is "A":
-                valid = True
-
-            elif ai_to_play is "GBFS":
-                valid = True
-
-            else:
-                quit = input("Invalid input. To quit, enter 'q': ").strip().lower() == 'q'
-                if quit:
-                    return
-
-        self.players.append(ai_player)
-
-        #Sets the default value of global variables.
-        current_player = self.players[0]
-        self.turn(current_player, board, bag)
-
-    def start_ai_game(self):
-        #Begins the game and calls the turn function.
-        board = ScrabbleBoard()
-        bag = Bag()
-        self.players = []
-
-        #Asks the player for the number of players.
-        valid = False
-
-        #Welcomes players to the game and allows players to choose their name.
-        print("\nWelcome to Scrabble! Please enter the AI of each player below. Options include 'MCTS', 'Beam', 'A', 'GBFS'")
-        self.players = []
-        for i in range(2):
-            while not valid:
-                ai_to_play = input("Please enter AI to be player " + str(i+1) + ": ")
-                if ai_to_play is "MCTS":
-                    valid = True
-
-                elif ai_to_play is "Beam":
-                    valid = True
-
-                elif ai_to_play is "A":
-                    valid = True
-
-                elif ai_to_play is "GBFS":
-                    valid = True
-
-                else:
-                    quit = input("Invalid input. To quit, enter 'q': ").strip().lower() == 'q'
-                    if quit:
-                        return
-            self.players.append(Player(bag))
-            self.players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
-
-        #Sets the default value of global variables.
-        current_player = self.players[0]
-        self.turn(current_player, board, bag)
-
-
-#######################
-
-
-def main():
-    scrabble = Game()
-
-    ai_game = input("Would you like to play against an AI? (y/n): ").strip().lower() == 'y'
-
-    ai_num = input("Do you want AI vs AI? (y/n): ").strip().lower() == 'y'
-
-    if ai_game:
-        ai_num = input("Do you want AI vs AI? (y/n): ").strip().lower() == 'y'
-        if ai_num:
-            scrabble.start_ai_game()
-
-        else:
-            scrabble.start_game_vs_ai()
-
-    else: 
-        scrabble.start_game()
 
 if __name__ == "__main__":
-    main()
+    from word_generator import load_dictionary, get_possible_words
+
+    # Example placeholder objects for standalone testing
+    class FakeBoard:
+        def __init__(self):
+            self.grid = [[" " for _ in range(15)] for _ in range(15)]
+
+    class FakePlayer:
+        def __init__(self, rack):
+            self.rack = rack
+
+    board = FakeBoard()
+    player = FakePlayer(['S', 'T', 'A', 'R', 'E', 'L', 'D'])
+
+    dictionary = load_dictionary("scrabbledict.txt")
+    legal_moves = get_possible_words(board, player.rack, dictionary, player, Word)
+
+    initial_state = {
+        'board': board,
+        'rack': player.rack,
+        'legal_moves': legal_moves,
+        'player': player  # ← Add this
+    }
+
+    best_move = monte_carlo_tree_search(initial_state, iterations=500)
+    print("Best Move Found:", best_move)
 
 
 ########################
