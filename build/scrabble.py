@@ -1072,6 +1072,92 @@ if __name__ == "__main__":
 
 ########################
 
+    class DAWGNode:
+    """Node in a Directed Acyclic Word Graph"""
+    
+    def __init__(self):
+        self.children = {}  # Map from characters to child nodes
+        self.is_terminal = False  # True if this node represents the end of a valid word
+        self.count = 0  # Number of words this node is part of (useful for pruning)
+    
+    
+    def __str__(self):
+        return f"DAWGNode(word={self.is_word}, children={list(self.children.keys())})"
+
+    def get_child(self, letter):
+        """
+        Get the child node for a given letter.
+        Args:
+            letter: The letter to follow
+        Returns:
+            The child DAWGNode if the letter exists, None otherwise
+        """
+        self.children.get(letter.lower())
+
+
+class DAWG:
+    """Directed Acyclic Word Graph implementation for efficient word storage and lookups"""
+    
+    def __init__(self):
+        self.root = DAWGNode()
+        self._minimize_cache = {}  # For minimization during construction
+    
+    def insert(self, word):
+        """Insert a word into the DAWG"""
+        if not word:
+            return
+        
+        word = word.lower()  # Normalize to lowercase
+        node = self.root
+        
+        for char in word:
+            if char not in node.children:
+                node.children[char] = DAWGNode()
+            node = node.children[char]
+            node.count += 1
+        
+        node.is_terminal = True # Mark as a valid word endpoint
+    
+    def contains(self, word):
+        """Check if a word exists in the DAWG"""
+        if not word:
+            return False
+        
+        word = word.lower()
+        node = self.root
+        
+        for char in word:
+            child_node = node.get_child(char)
+            if child_node is None:
+                return False
+            node = child_node
+        
+        return node.is_terminal
+    
+    def get_words_with_prefix(self, prefix):
+        """Get all words with the given prefix"""
+        prefix = prefix.lower()
+        words = []
+        node = self.root
+        
+        # Navigate to the node representing the prefix
+        for char in prefix:
+            child_node = node.get_child(char)
+            if child_node is None:
+                return words  # Prefix not found
+            node = child_node
+        
+        # DFS to find all words from this node
+        self._dfs_collect_words(node, prefix, words)
+        return words
+
+    def _dfs_collect_words(self, node, prefix, words):
+        """Helper method to collect all words with DFS"""
+        if node.is_terminal:
+            words.append(prefix)
+        
+        for char, child_node in node.children.items():
+            self._dfs_collect_words(child_node, prefix + char, words)
 
 class BeamSearchScrabble:
     def __init__(self, rack, board, beam_width=10, max_depth=7):
@@ -1088,7 +1174,7 @@ class BeamSearchScrabble:
         self.beam_width = beam_width
         self.max_depth = max_depth
     
-    def find_best_move(self, rack):
+    def find_best_move(self):
         """
         Find the best move given the current rack and board state.
         
@@ -1098,16 +1184,12 @@ class BeamSearchScrabble:
         Returns:
         - best_move: The highest scoring valid move found
         """
-        initial_candidates = [{'placed_tiles': [], 'score': 0, 'rack': rack.copy()}]
+        initial_candidates = [{'placed_tiles': [], 'score': 0, 'rack': self.rack.copy()}]
         best_move = None
         best_score = 0
         
         # Identify all anchor points (empty cells adjacent to existing tiles)
-        anchor_points = self._find_anchor_points()
-        if not anchor_points and self.game.is_first_move:
-            # For the first move, use the center of the board
-            center = self.game.size // 2
-            anchor_points = [(center, center)]
+        anchor_points = self.board.find_anchor_points()
         
         # Try starting a word from each anchor point
         for anchor in anchor_points:
@@ -1131,59 +1213,8 @@ class BeamSearchScrabble:
                         best_score = candidate['score']
             
         return best_move
-
-    def _find_anchor_points(self):
-        """Find all empty cells adjacent to placed tiles."""
-        anchor_points = set()
-        current_node = self.board.get_node(0,0)
-        is_empty_board = True
-        
-        # Traverse the board to find anchor points
-        row_node = current_node
-        while row_node:
-            col_node = row_node
-            while col_node:
-                if col_node.occupied:
-                    is_empty_board = False
-                    break
-                col_node = col_node.right
-            if not is_empty_board:
-                break
-            row_node = row_node.down
-
-        if is_empty_board:
-            return [(7, 7)]
-        
-        row_node = current_node
-        row_index = 0
-
-        while row_node:
-            col_node = row_node
-            col_index = 0
-
-            while col_node:
-                if not col_node.occupied:
-                    adjacent_cells = [
-                        (col_node.right, "right"),
-                        (col_node.down, "down"),
-                        (col_node.left, "left"),
-                        (col_node.up, "up"),
-                    ]
-                    for adjacent_node, direction in adjacent_cells:
-                        if adjacent_node and adjacent_node.occupied:
-                            anchor_points.add((row_index, col_index))
-                            break
-                col_node = col_node.right
-                col_index += 1
-
-            row_node = row_node.down
-            row_index += 1
-
-        print(anchor_points)
-            
-        return list(anchor_points)
     
-    def _generate_next_moves(self, candidate, anchor):
+    def generate_moves(self, candidate, anchor):
         """
         Generate all possible next moves from the current candidate.
         
@@ -1234,6 +1265,35 @@ class BeamSearchScrabble:
             current_node = getattr(current_node, direction)
         
         return new_candidates
+    
+    def left_part(self, partial, dawgnode, limit, anchor):
+        self.extend_right(partial, dawgnode, limit, anchor)
+        if limit > 0:
+            for letter in set(self.rack):
+                next_node = dawgnode.get_child()
+        # results = [partial] if dawgnode.is_terminal else []
+    
+        # # Base case: we've reached our limit for the left part
+        # if limit <= 0:
+        #     return results
+        
+        # # Try extending with each letter in the rack
+        # for letter in set(self.rack):  # Using set to avoid duplicates
+        #     next_node = dawgnode.get_child(letter)
+        #     if next_node:  # If this is a valid prefix in our dictionary
+        #         # Create a new rack without the used letter
+        #         new_rack = list(self.rack)
+        #         new_rack.remove(letter)
+                
+        #         # Recursively find all extensions of this prefix
+        #         extensions = generate_left_parts(
+        #             next_node, 
+        #             new_rack,
+        #             limit - 1, 
+        #             partial + letter
+        #         )
+        #         results.extend(extensions)
+        # return results
     
     def _get_node_at_position(self, position):
         """Get the node at the specified board position."""
@@ -1317,7 +1377,3 @@ class BeamSearchScrabble:
         cols = [pos[1] for pos in positions]
         
         return len(set(rows)) == 1 or len(set(cols)) == 1
-
-
-
-

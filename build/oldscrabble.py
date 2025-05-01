@@ -218,7 +218,7 @@ class BoardNode(object):
             print(f"Tile at {self.position} already occupied\n")
             return False
         self.tile = tile
-        self.char = tile
+        self.char = tile.get_letter()
         self.occupied = True
         
     def place_blank(self, tile, char):
@@ -430,6 +430,60 @@ class ScrabbleBoard:
         
         return current
     
+<<<<<<< HEAD:build/scrabble2.py
+    def find_anchor_points(self):
+        """Find all empty cells adjacent to placed tiles."""
+        anchor_points = set()
+        current_node = self.start_node
+        is_empty_board = True
+        
+        # Traverse the board to find anchor points
+        row_node = current_node
+        while row_node:
+            col_node = row_node
+            while col_node:
+                if col_node.occupied:
+                    is_empty_board = False
+                    break
+                col_node = col_node.right
+            if not is_empty_board:
+                break
+            row_node = row_node.down
+
+        if is_empty_board:
+            return [None, (7, 7)]
+        
+        row_node = current_node
+        row_index = 0
+
+        while row_node:
+            col_node = row_node
+            col_index = 0
+
+            while col_node:
+                if not col_node.occupied:
+                    adjacent_cells = [
+                        (col_node.right, "right"),
+                        (col_node.down, "down"),
+                        (col_node.left, "left"),
+                        (col_node.up, "up"),
+                    ]
+                    for adjacent_node, direction in adjacent_cells:
+                        if adjacent_node and adjacent_node.occupied:
+                            anchor_points.add((row_index, col_index))
+                            break
+                col_node = col_node.right
+                col_index += 1
+
+            row_node = row_node.down
+            row_index += 1
+
+        print(anchor_points)
+            
+        return list(anchor_points)
+
+=======
+>>>>>>> e0ce265bbd84c2996bfe4641c0b962da87f8e7bc:build/oldscrabble.py
 class Word:
     """
     Class representing a word being played on the board.
@@ -921,6 +975,444 @@ def start_game():
         players.append(Player(bag))
         players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
 
+<<<<<<< HEAD:build/scrabble2.py
+    def end_game(self):
+        #Forces the game to end when the bag runs out of tiles.
+        global LETTER_VALUES
+        for player in self.players:
+            curr_score = player.get_score()
+            for tile in player.rack.rack:
+                letter_score = LETTER_VALUES[tile]
+                curr_score -= letter_score
+            player.increase_score(-curr_score)
+
+        highest_score = 0
+        winning_player = ""
+        for player in self.players:
+            if player.get_score() > highest_score:
+                highest_score = player.get_score()
+                winning_player = player.get_name()
+        print("The game is over! " + winning_player + ", you have won!")
+
+        if input("\nWould you like to play again? (y/n)").upper() == "Y":
+            self.start_game()
+    
+    def start_game_vs_ai(self):
+        #Begins the game and calls the turn function.
+        board = ScrabbleBoard()
+        bag = Bag()
+        self.players = []
+
+        #Asks the player for the number of players.
+        valid = False
+
+        #Welcomes players to the game and allows players to choose their name.
+        print("\nWelcome to Scrabble! Please enter the names of the players below.")
+
+        human_player = Player(bag)
+        human_player.set_name(input("Please enter your name: "))
+        self.players.append(human_player)
+
+        ai_player = Player(bag)
+        while not valid:
+            ai_to_play = input("Please enter AI to be player " + str(i+1) + ": ")
+            if ai_to_play is "MCTS":
+                valid = True
+
+            elif ai_to_play is "Beam":
+                valid = True
+
+            elif ai_to_play is "A":
+                valid = True
+
+            elif ai_to_play is "GBFS":
+                valid = True
+
+            else:
+                quit = input("Invalid input. To quit, enter 'q': ").strip().lower() == 'q'
+                if quit:
+                    return
+
+        self.players.append(ai_player)
+
+        #Sets the default value of global variables.
+        current_player = self.players[0]
+        self.turn(current_player, board, bag)
+
+    def start_ai_game(self):
+        #Begins the game and calls the turn function.
+        board = ScrabbleBoard()
+        bag = Bag()
+        self.players = []
+
+        #Asks the player for the number of players.
+        valid = False
+
+        #Welcomes players to the game and allows players to choose their name.
+        print("\nWelcome to Scrabble! Please enter the AI of each player below. Options include 'MCTS', 'Beam', 'A', 'GBFS'")
+        self.players = []
+        for i in range(2):
+            while not valid:
+                ai_to_play = input("Please enter AI to be player " + str(i+1) + ": ")
+                if ai_to_play is ["MCTS", "Beam", "A", "GBFS"]:
+                    valid = True
+                if ai_to_play is "MCTS":
+                    valid = True
+                    
+                elif ai_to_play is "Beam":
+                    valid = True
+
+                elif ai_to_play is "A":
+                    valid = True
+
+                elif ai_to_play is "GBFS":
+                    valid = True
+
+                else:
+                    quit = input("Invalid input. To quit, enter 'q': ").strip().lower() == 'q'
+                    if quit:
+                        return
+            self.players.append(Player(bag))
+            self.players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
+
+        #Sets the default value of global variables.
+        current_player = self.players[0]
+        self.turn(current_player, board, bag)
+
+
+#######################
+
+
+def main():
+    scrabble = Game()
+
+    ai_game = input("Would you like to play against an AI? (y/n): ").strip().lower() == 'y'
+
+    ai_num = input("Do you want AI vs AI? (y/n): ").strip().lower() == 'y'
+
+    if ai_game:
+        ai_num = input("Do you want AI vs AI? (y/n): ").strip().lower() == 'y'
+        if ai_num:
+            scrabble.start_ai_game()
+
+        else:
+            scrabble.start_game_vs_ai()
+
+    else: 
+        scrabble.start_game()
+
+if __name__ == "__main__":
+    main()
+
+
+########################
+
+class DAWGNode:
+    """Node in a Directed Acyclic Word Graph"""
+    
+    def __init__(self):
+        self.children = {}  # Map from characters to child nodes
+        self.is_terminal = False  # True if this node represents the end of a valid word
+        self.count = 0  # Number of words this node is part of (useful for pruning)
+    
+    
+    def __str__(self):
+        return f"DAWGNode(word={self.is_word}, children={list(self.children.keys())})"
+
+    def get_child(self, letter):
+        """
+        Get the child node for a given letter.
+        Args:
+            letter: The letter to follow
+        Returns:
+            The child DAWGNode if the letter exists, None otherwise
+        """
+        self.children.get(letter.lower())
+
+
+class DAWG:
+    """Directed Acyclic Word Graph implementation for efficient word storage and lookups"""
+    
+    def __init__(self):
+        self.root = DAWGNode()
+        self._minimize_cache = {}  # For minimization during construction
+    
+    def insert(self, word):
+        """Insert a word into the DAWG"""
+        if not word:
+            return
+        
+        word = word.lower()  # Normalize to lowercase
+        node = self.root
+        
+        for char in word:
+            if char not in node.children:
+                node.children[char] = DAWGNode()
+            node = node.children[char]
+            node.count += 1
+        
+        node.is_terminal = True # Mark as a valid word endpoint
+    
+    def contains(self, word):
+        """Check if a word exists in the DAWG"""
+        if not word:
+            return False
+        
+        word = word.lower()
+        node = self.root
+        
+        for char in word:
+            child_node = node.get_child(char)
+            if child_node is None:
+                return False
+            node = child_node
+        
+        return node.is_terminal
+    
+    def get_words_with_prefix(self, prefix):
+        """Get all words with the given prefix"""
+        prefix = prefix.lower()
+        words = []
+        node = self.root
+        
+        # Navigate to the node representing the prefix
+        for char in prefix:
+            child_node = node.get_child(char)
+            if child_node is None:
+                return words  # Prefix not found
+            node = child_node
+        
+        # DFS to find all words from this node
+        self._dfs_collect_words(node, prefix, words)
+        return words
+
+    def _dfs_collect_words(self, node, prefix, words):
+        """Helper method to collect all words with DFS"""
+        if node.is_terminal:
+            words.append(prefix)
+        
+        for char, child_node in node.children.items():
+            self._dfs_collect_words(child_node, prefix + char, words)
+
+class BeamSearchScrabble:
+    def __init__(self, rack, board, beam_width=10, max_depth=7):
+        """
+        Initialize the beam search algorithm.
+        
+        Parameters:
+        - game: Your Scrabble game instance
+        - beam_width: Number of candidates to keep at each step
+        - max_depth: Maximum number of tiles to place in a single move
+        """
+        self.rack = rack
+        self.board = board
+        self.beam_width = beam_width
+        self.max_depth = max_depth
+    
+    def find_best_move(self):
+        """
+        Find the best move given the current rack and board state.
+        
+        Parameters:
+        - rack: List of tiles in the player's rack
+        
+        Returns:
+        - best_move: The highest scoring valid move found
+        """
+        initial_candidates = [{'placed_tiles': [], 'score': 0, 'rack': self.rack.copy()}]
+        best_move = None
+        best_score = 0
+        
+        # Identify all anchor points (empty cells adjacent to existing tiles)
+        anchor_points = self.board.find_anchor_points()
+        
+        # Try starting a word from each anchor point
+        for anchor in anchor_points:
+            candidates = initial_candidates.copy()
+            
+            for depth in range(self.max_depth):
+                new_candidates = []
+                
+                for candidate in candidates:
+                    # Generate next possible moves from this candidate
+                    next_moves = self._generate_next_moves(candidate, anchor)
+                    new_candidates.extend(next_moves)
+                
+                # Keep only the beam_width best candidates
+                candidates = sorted(new_candidates, key=lambda x: x['score'], reverse=True)[:self.beam_width]
+                
+                # Update best move if we found a better one
+                for candidate in candidates:
+                    if candidate['score'] > best_score and self._is_valid_move(candidate):
+                        best_move = candidate
+                        best_score = candidate['score']
+            
+        return best_move
+    
+    def generate_moves(self, candidate, anchor):
+        """
+        Generate all possible next moves from the current candidate.
+        
+        Parameters:
+        - candidate: Current candidate move
+        - anchor: Position to start the word
+        
+        Returns:
+        - List of new candidate moves
+        """
+        new_candidates = []
+        remaining_rack = candidate['rack']
+        
+        # Get node at anchor position
+        node = self._get_node_at_position(anchor)
+        
+        # Try each direction (right, down)
+        for direction in ['right', 'down']:
+            current_node = node
+            
+            # Skip if we can't go in this direction
+            if not getattr(current_node, direction):
+                continue
+                
+            # Try each tile in the rack
+            for i, tile in enumerate(remaining_rack):
+                # Skip if cell is already occupied
+                if current_node.occupied:
+                    continue
+                    
+                # Create a new candidate with this tile placed
+                new_rack = remaining_rack.copy()
+                new_rack.pop(i)
+                
+                new_placed = candidate['placed_tiles'].copy()
+                new_placed.append((current_node.position, tile))
+                
+                # Calculate the score for this placement
+                new_score = self._calculate_placement_score(new_placed)
+                
+                new_candidates.append({
+                    'placed_tiles': new_placed,
+                    'score': new_score,
+                    'rack': new_rack
+                })
+                
+            # Move to the next node in the direction
+            current_node = getattr(current_node, direction)
+        
+        return new_candidates
+    
+    def left_part(self, partial, dawgnode, limit, anchor):
+        self.extend_right(partial, dawgnode, limit, anchor)
+        if limit > 0:
+            for letter in set(self.rack):
+                next_node = dawgnode.get_child()
+        # results = [partial] if dawgnode.is_terminal else []
+    
+        # # Base case: we've reached our limit for the left part
+        # if limit <= 0:
+        #     return results
+        
+        # # Try extending with each letter in the rack
+        # for letter in set(self.rack):  # Using set to avoid duplicates
+        #     next_node = dawgnode.get_child(letter)
+        #     if next_node:  # If this is a valid prefix in our dictionary
+        #         # Create a new rack without the used letter
+        #         new_rack = list(self.rack)
+        #         new_rack.remove(letter)
+                
+        #         # Recursively find all extensions of this prefix
+        #         extensions = generate_left_parts(
+        #             next_node, 
+        #             new_rack,
+        #             limit - 1, 
+        #             partial + letter
+        #         )
+        #         results.extend(extensions)
+        # return results
+    
+    def _get_node_at_position(self, position):
+        """Get the node at the specified board position."""
+        current = self.game.start_node
+        row, col = position
+        
+        # Move down to the correct row
+        for _ in range(row):
+            if current.down:
+                current = current.down
+        
+        # Move right to the correct column
+        for _ in range(col):
+            if current.right:
+                current = current.right
+                
+        return current
+    
+    def _calculate_placement_score(self, placed_tiles):
+        """
+        Calculate the score for a set of placed tiles.
+        This should leverage your existing calculate_word_score function.
+        """
+        # This is a placeholder - you'll need to implement this based on your game's scoring logic
+        # You'll want to identify all words formed by these placements and sum their scores
+        
+        # For each placed tile, check if it forms words horizontally and vertically
+        total_score = 0
+        words_formed = self._identify_words_formed(placed_tiles)
+        
+        for word in words_formed:
+            if self.check_word(word):
+                word_score = self.calculate_word_score(word)
+                total_score += word_score
+                
+        return total_score
+    
+    def _identify_words_formed(self, placed_tiles):
+        """
+        Identify all words formed by the placed tiles.
+        Returns a list of words (as strings).
+        """
+        # This is a placeholder - you'll need to implement this based on your board representation
+        # For each placed tile, extend left/right and up/down to find complete words
+        words = []
+        
+        # Implementation would depend on your specific board representation
+        # and how you track words
+        
+        return words
+    
+    def _is_valid_move(self, candidate):
+        """
+        Check if a candidate move is valid according to Scrabble rules.
+        """
+        # A move is valid if:
+        # 1. All formed words are valid
+        # 2. All placed tiles are in a single row or column
+        # 3. All placed tiles are connected to existing tiles (except first move)
+        # 4. No tiles overlap with existing tiles
+        
+        # For simplicity, let's assume we're checking word validity in _calculate_placement_score
+        # and we're handling overlap prevention in _generate_next_moves
+        
+        placed_positions = [pos for pos, _ in candidate['placed_tiles']]
+        
+        # Check if tiles are placed in a straight line
+        if not self._is_straight_line(placed_positions):
+            return False
+            
+        # Other validity checks would go here
+        
+        return True
+    
+    def _is_straight_line(self, positions):
+        """Check if all positions are in a straight line (same row or same column)."""
+        if not positions:
+            return True
+            
+        rows = [pos[0] for pos in positions]
+        cols = [pos[1] for pos in positions]
+        
+        return len(set(rows)) == 1 or len(set(cols)) == 1
+=======
     #Sets the default value of global variables.
     round_number = 1
     skipped_turns = 0
@@ -950,3 +1442,4 @@ def end_game():
         start_game()
 
 start_game()
+>>>>>>> e0ce265bbd84c2996bfe4641c0b962da87f8e7bc:build/oldscrabble.py
