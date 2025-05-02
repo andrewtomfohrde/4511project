@@ -651,6 +651,9 @@ class Tile:
     def get_char(self):
         #Returns what char the tile represents (ex. blank = A)
         return self.char
+    
+    def set_char(self, c):
+        self.char = c
 
     def get_score(self):
         #Returns the tile's score value.
@@ -789,6 +792,11 @@ class Player:
 
     def get_score(self):
         #Returns the player's score
+        return self.score
+    
+    def end_score(self):
+        for tile in self.get_rack_arr():
+            self.score -= tile.get_score()
         return self.score
     
 class BoardNode(object):
@@ -1040,7 +1048,7 @@ class Word:
         self.player = player
         self.direction = direction.lower()
         self.board = board
-        self.blank_positions = []
+        self.blank_positions = [] # do we need
     
     def check_word(self):
         """
