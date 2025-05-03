@@ -129,17 +129,17 @@ class Word:
             row, col = self.location
             curr_tile = self.board.get_node(row, col)
             i = 1
-            while (curr_tile.left.tile) and (col - i >= 0):
+            while (col - i >= 0) and (curr_tile.left.tile):
                 curr_tile = curr_tile.left
                 i += 1
-                if (not curr_tile.left.tile) or (col - i == 0):
+                if (col - i == 0) or (not curr_tile.left.tile):
                     break
             i = 0
             while ((curr_tile.right.tile) or (curr_tile.position == (row, col + i))) and (col + i <= 14):
                 if curr_tile.position == (row, col + i) and len(self.word) > i:
                     full += self.word[i]
                 elif (curr_tile.right.tile):
-                    full += curr_tile.char
+                    full += curr_tile.tile.letter
                     i = 0
                 else:
                     break
@@ -160,7 +160,7 @@ class Word:
                 if curr_tile.position == (row + i, col) and len(self.word) > i:
                     full += self.word[i]
                 elif (curr_tile.down.tile):
-                    full += curr_tile.char
+                    full += curr_tile.tile.get_letter()
                     i = 0
                 else:
                     break
@@ -189,11 +189,11 @@ class Word:
             for i, letter in enumerate(self.word):
                 node = self.board.get_node(self.location[0], self.location[1] + i)
                 if node.tile:
-                    if node.char != self.word[i]:
-                        print(f"Invalid move, played {self.word[i]} instead of {node.char}. Try again!")
+                    if node.tile.letter != self.word[i]:
+                        print(f"Invalid move, played {self.word[i]} instead of {node.tile.letter}. Try again!")
                         return False, None
                     else:
-                        board_letters.append(node.char)
+                        board_letters.append(node.tile.letter())
                         required_letters[i] = None  # Mark as provided by board
                         place_tiles.append(((self.location[0], self.location[1] + i), None))
                 else:
@@ -202,11 +202,11 @@ class Word:
             for i, letter in enumerate(self.word):
                 node = self.board.get_node(self.location[0] + i, self.location[1])
                 if node.tile:
-                    if node.char != self.word[i]:
-                        print(f"Invalid move, played {self.word[i]} instead of {node.char}. Try again!")
+                    if node.tile.letter != self.word[i]:
+                        print(f"Invalid move, played {self.word[i]} instead of {node.tile.letter}. Try again!")
                         return False, None
                     else:
-                        board_letters.append(node.char)
+                        board_letters.append(node.tile.letter)
                         required_letters[i] = None  # Mark as provided by board
                         place_tiles.append(((self.location[0] + i, self.location[1]), None))
                 else:
@@ -262,13 +262,13 @@ class Word:
                 # Look upward
                 r = row - 1
                 while r >= 0 and self.board.get_node(r, col).tile:
-                    word = self.board.get_node(r, col).char + word
+                    word = self.board.get_node(r, col).tile.letter + word
                     r -= 1
 
                 # Look downward
                 r = row + 1
                 while r < 15 and self.board.get_node(r, col).tile:
-                    word += self.board.get_node(r, col).char
+                    word += self.board.get_node(r, col).tile.letter
                     r += 1
 
             # If the main word is vertical, look horizontally
@@ -276,13 +276,13 @@ class Word:
                 # Look left
                 c = col - 1
                 while c >= 0 and self.board.get_node(row, c).tile:
-                    word = self.board.get_node(row, c).char + word
+                    word = self.board.get_node(row, c).tile.letter + word
                     c -= 1
 
                 # Look right
                 c = col + 1
                 while c < 15 and self.board.get_node(row, c).tile:
-                    word += self.board.get_node(row, c).char
+                    word += self.board.get_node(row, c).tile.letter
                     c += 1
 
             # Only add if an actual secondary word was formed

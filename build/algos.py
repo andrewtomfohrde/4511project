@@ -40,14 +40,14 @@ class ScrabbleAI(Player):
 
     def set_strat(self, strat_name):
         self.name = f"AI_{strat_name}"
-        if strat_name == "Beam":
+        if strat_name == "BEAM":
             self.strategy = BEAM()    # strat
-        elif strat_name == "Astar":
+        elif strat_name == "ASTAR":
             self.strategy = ASTAR()   # strat
         elif strat_name == "GBFS":
             self.strategy = GBFS()    # strat
         elif strat_name == "BFS":
-            self.strategy = BFS()     #strat
+            self.strategy = BFS()     # strat
         else:
             self.strategy = MCTS()
             self.name = "AI_MCTS"
@@ -57,6 +57,23 @@ class ScrabbleAI(Player):
     def get_name(self):
         #Gets the AIplayer's name.
         return self.name
+
+    def make_move(self, board):
+        """Make the best move according to the current strategy"""
+        # Find all legal moves
+        legal_moves = self.find_all_moves(board)
+        
+        if not legal_moves:
+            return None, "skip"
+        
+        # Use the strategy to find the best move
+        # USE a "find_best_move" function WITHIN EACH STRAT
+        best_move = self.strategy.find_best_move(board, self.rack, legal_moves)
+        
+        if not best_move:
+            return None, "skip"
+        
+        return best_move, "play"
     
     def get_cross_checks(self, row, col, direction):
         """
@@ -123,7 +140,7 @@ class ScrabbleAI(Player):
                         # This is our test position
                         word += letter
                     elif curr_node.tile:
-                        word += curr_node.tile
+                        word += curr_node.tile.letter
                     else:
                         break
                     
@@ -178,7 +195,7 @@ class ScrabbleAI(Player):
                         # This is our test position
                         word += letter
                     elif curr_node.tile:
-                        word += curr_node.tile
+                        word += curr_node.tile.letter
                     else:
                         break
                     
@@ -349,10 +366,11 @@ class ScrabbleAI(Player):
                 valid_letters = set(available_rack)
             else:
                 # Get the set of valid letters based on cross-checks
-                valid_letters = self.get_cross_checks(row, col, direction).intersection(set(available_rack))
+                valid_letters = self.get_cross_checks(row, col, direction).intersection(available_rack)
             
             # Try each valid letter
-            for letter in valid_letters:
+            for tile in valid_letters:
+                letter = tile.letter
                 # Check if this letter continues a valid path in our dictionary
                 next_node = dict_node.get_child(letter)
                 if next_node:
@@ -648,7 +666,7 @@ class ScrabbleAI(Player):
         """
         if self.strategy == "greedy":
             # Simple greedy strategy - just pick the highest scoring move
-            return self.get_greedy_move()
+            return self.get_greedy_move() # to be properly implemented
         elif self.strategy == "mcts":
             # Monte Carlo Tree Search strategy
             return self.get_mcts_move()
@@ -785,7 +803,7 @@ def monte_carlo_tree_search(initial_state, iterations=1000):
     best = max(root.children, key=lambda c: c.visits)
     return best.move
 
-class BeamSearchScrabble:
+class BEAM:
     def __init__(self, rack, board, beam_width=10, max_depth=7):
         """
         Initialize the beam search algorithm.
