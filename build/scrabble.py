@@ -260,27 +260,6 @@ class ScrabbleBoard:
             current = current.right
         
         return current
-    
-    def find_anchor_points(self):
-
-        """Find all empty cells adjacent to placed tiles."""
-        anchor_points = set()
-        current_node = self.start_node
-        
-        # Traverse the board to find anchor points
-        for i in range(self.size):
-            row_node = current_node
-            for j in range(self.size):
-                if not row_node.tile:
-                    # Check if any adjacent node is occupied
-                    if ((row_node.right and row_node.right.tile) or
-                        (row_node.left and row_node.left.tile) or
-                        (row_node.up and row_node.up.tile) or
-                        (row_node.down and row_node.down.tile)):
-                        anchor_points.add(row_node.position)
-                row_node = row_node.right
-            current_node = current_node.down
-        return list(anchor_points)
 
 
 ##############################################################################3###
