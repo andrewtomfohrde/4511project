@@ -40,9 +40,9 @@ class ScrabbleAI(Player):
 
     def set_strat(self, strat_name):
         self.name = f"AI_{strat_name}"
-        if strat_name == "Beam":
+        if strat_name == "BEAM":
             self.strategy = BEAM()    # strat
-        elif strat_name == "Astar":
+        elif strat_name == "ASTAR":
             self.strategy = ASTAR()   # strat
         elif strat_name == "GBFS":
             self.strategy = GBFS()    # strat
