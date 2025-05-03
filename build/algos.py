@@ -1,6 +1,7 @@
 from dictionarytrie import DictionaryTrie
 from player import Player
 from word import Word
+import math
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
@@ -690,55 +691,6 @@ def calculate_cross_word_score(board, row, col, letter, direction):
     if len(word) >= 2:
         return word_score * word_multiplier
     return 0
-    
-    def get_mcts_move(self):
-        """
-        Get the best move using Monte Carlo Tree Search.
-        
-        Returns:
-            The best move according to MCTS
-        """
-        # Find all valid moves first
-        moves = self.find_all_moves()
-        if not moves:
-            return None
-            
-        # Set up the initial state for MCTS
-        initial_state = {
-            'board': self.board,
-            'player': {'score': 0},  # Simplified player object for simulation
-            'legal_moves': moves
-        }
-        
-        # Run MCTS
-        best_move = monte_carlo_tree_search(initial_state)
-        return best_move
-    
-    
-    class BEAM:
-        def __init__(self, rack, board, beam_width=10, max_depth=7):
-            """
-            Initialize the beam search algorithm.
-            
-            Parameters:
-            - game: Your Scrabble game instance
-            - beam_width: Number of candidates to keep at each step
-            - max_depth: Maximum number of tiles to place in a single move
-            """
-            self.rack = rack
-            self.board = board
-            self.beam_width = beam_width
-            self.max_depth = max_depth
-            
-        def find_best_move(self):
-            beam = []
-            finished = False
-            while not finished:
-                candidates = []
-                
-                for move in beam:
-                    extensions = 
-            
 
 class MCTS:
     def __init__(self, state, parent=None, move=None):
