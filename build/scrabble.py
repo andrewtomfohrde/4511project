@@ -81,8 +81,6 @@ class ScrabbleBoard:
             self.down = None
             self.left = None
             self.up = None
-            self.char = ' '
-            self.occupied = False
             self.position = (0, 0) # (row, column)
             self.score_multiplier = ""
             # TRIPLE_WORD_SCORE = ((0,0), (7, 0), (14,0), (0, 7), (14, 7), (0, 14), (7, 14), (14,14))
@@ -92,24 +90,15 @@ class ScrabbleBoard:
             
         
         def place_tile(self, tile):
-            if self.occupied:
-                print(f"Tile at {self.position} already occupied\n")
-                return False
             self.tile = tile
-            self.char = tile
-            self.occupied = True
             
         def place_blank(self, tile, char):
-            if self.occupied:
-                print(f"Tile at {self.position} already occupied\n")
-                return False
             self.tile = tile
-            self.char = char
-            self.occupied = True
+            self.char = tile.letter
             
         def get_display_str(self):
             """Return a string representation of this cell."""
-            if self.occupied:
+            if self.tile:
                 return f"{self.char}/{self.tile}"
             elif self.position == (7, 7):  # Center square
                 return " * "
@@ -312,12 +301,12 @@ class ScrabbleBoard:
         for i in range(self.size):
             row_node = current_node
             for j in range(self.size):
-                if not row_node.occupied:
+                if not row_node.tile:
                     # Check if any adjacent node is occupied
-                    if ((row_node.right and row_node.right.occupied) or
-                        (row_node.left and row_node.left.occupied) or
-                        (row_node.up and row_node.up.occupied) or
-                        (row_node.down and row_node.down.occupied)):
+                    if ((row_node.right and row_node.right.tile) or
+                        (row_node.left and row_node.left.tile) or
+                        (row_node.up and row_node.up.tile) or
+                        (row_node.down and row_node.down.tile)):
                         anchor_points.add(row_node.position)
                 row_node = row_node.right
             current_node = current_node.down

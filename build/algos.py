@@ -31,9 +31,9 @@ LETTER_VALUES = {"A": 1,
                  "#": 0}
 
 class ScrabbleAI(Player):
-    def __init__(self, name, dictionary, board, bag, strategy):
+    def __init__(self, dictionary, board, bag, strategy):
         super().__init__(bag)  # Initialize the Player attributes
-        self.dictionary = dictionary
+        self.dict = dictionary
         self.board = board
         self.strategy = strategy
         self.valid_moves = []
@@ -131,7 +131,7 @@ class ScrabbleAI(Player):
                     continue
                 
                 # Check if this is a valid word in our dictionary
-                if self.dictionary.is_word(word):
+                if self.dict.is_word(word):
                     valid_cross_letters.add(letter)
             
             return valid_cross_letters
@@ -186,7 +186,7 @@ class ScrabbleAI(Player):
                     continue
                 
                 # Check if this is a valid word in our dictionary
-                if self.dictionary.is_word(word):
+                if self.dict.is_word(word):
                     valid_cross_letters.add(letter)
             
             return valid_cross_letters
@@ -285,7 +285,7 @@ class ScrabbleAI(Player):
             prefix_length: How far into the word is the anchor point
         """
         # Start with the root of the dictionary trie
-        self.generate_moves_recursive("", self.dictionary.root, start_row, start_col, 
+        self.generate_moves_recursive("", self.dict.root, start_row, start_col, 
                                      rack, direction, prefix_length, [], False)
     
     # def generate_moves_recursive(self, partial_word, dict_node, row, col, available_rack, 

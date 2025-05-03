@@ -72,7 +72,7 @@ class Word:
         for row in range(15):
             for col in range(15):
                 node = self.board.get_node(row, col)
-                if node.occupied:
+                if node.tile:
                     first_word = False
                     break
             if not first_word:
@@ -102,7 +102,7 @@ class Word:
             for pos in all_positions:
                 row, col = pos
                 node = self.board.get_node(row, col)
-                if node.occupied:
+                if node.tile:
                     connects_to_existing = True
                     break
             
@@ -115,7 +115,7 @@ class Word:
                     for adj_row, adj_col in adjacent_positions:
                         if 0 <= adj_row < 15 and 0 <= adj_col < 15:
                             node = self.board.get_node(adj_row, adj_col)
-                            if node.occupied:
+                            if node.tile:
                                 connects_to_existing = True
                                 break
                     if connects_to_existing:
@@ -129,16 +129,16 @@ class Word:
             row, col = self.location
             curr_tile = self.board.get_node(row, col)
             i = 1
-            while (curr_tile.left.occupied) and (col - i >= 0):
+            while (curr_tile.left.tile) and (col - i >= 0):
                 curr_tile = curr_tile.left
                 i += 1
-                if (not curr_tile.left.occupied) or (col - i == 0):
+                if (not curr_tile.left.tile) or (col - i == 0):
                     break
             i = 0
-            while ((curr_tile.right.occupied) or (curr_tile.position == (row, col + i))) and (col + i <= 14):
+            while ((curr_tile.right.tile) or (curr_tile.position == (row, col + i))) and (col + i <= 14):
                 if curr_tile.position == (row, col + i) and len(self.word) > i:
                     full += self.word[i]
-                elif (curr_tile.right.occupied):
+                elif (curr_tile.right.tile):
                     full += curr_tile.char
                     i = 0
                 else:
@@ -150,16 +150,16 @@ class Word:
             row, col = self.location
             curr_tile = self.board.get_node(row, col)
             i = 1
-            while (curr_tile.up.occupied) and (row - i >= 0):
+            while (curr_tile.up.tile) and (row - i >= 0):
                 curr_tile = curr_tile.up
                 i += 1
-                if (not curr_tile.up.occupied) or (row - i == 0):
+                if (not curr_tile.up.tile) or (row - i == 0):
                     break
             i = 0
-            while ((curr_tile.down and curr_tile.down.occupied) or (curr_tile.position == (row + i, col))) and (row + i <= 14):
+            while ((curr_tile.down and curr_tile.down.tile) or (curr_tile.position == (row + i, col))) and (row + i <= 14):
                 if curr_tile.position == (row + i, col) and len(self.word) > i:
                     full += self.word[i]
-                elif (curr_tile.down.occupied):
+                elif (curr_tile.down.tile):
                     full += curr_tile.char
                     i = 0
                 else:
@@ -188,7 +188,7 @@ class Word:
         if self.direction == "right":
             for i, letter in enumerate(self.word):
                 node = self.board.get_node(self.location[0], self.location[1] + i)
-                if node.occupied:
+                if node.tile:
                     if node.char != self.word[i]:
                         print(f"Invalid move, played {self.word[i]} instead of {node.char}. Try again!")
                         return False, None
@@ -201,7 +201,7 @@ class Word:
         else:  # down
             for i, letter in enumerate(self.word):
                 node = self.board.get_node(self.location[0] + i, self.location[1])
-                if node.occupied:
+                if node.tile:
                     if node.char != self.word[i]:
                         print(f"Invalid move, played {self.word[i]} instead of {node.char}. Try again!")
                         return False, None
@@ -226,7 +226,7 @@ class Word:
                 return False, None
         
         # Now check and validate all secondary words formed
-        if self.board.get_node(7,7).occupied:
+        if self.board.get_node(7,7).tile:
             secondary_words = self.find_secondary_words(place_tiles)
             for word in secondary_words:
                 if word not in dictionary and len(word) > 1:
@@ -261,13 +261,13 @@ class Word:
             if self.direction == "right":
                 # Look upward
                 r = row - 1
-                while r >= 0 and self.board.get_node(r, col).occupied:
+                while r >= 0 and self.board.get_node(r, col).tile:
                     word = self.board.get_node(r, col).char + word
                     r -= 1
 
                 # Look downward
                 r = row + 1
-                while r < 15 and self.board.get_node(r, col).occupied:
+                while r < 15 and self.board.get_node(r, col).tile:
                     word += self.board.get_node(r, col).char
                     r += 1
 
@@ -275,13 +275,13 @@ class Word:
             elif self.direction == "down":
                 # Look left
                 c = col - 1
-                while c >= 0 and self.board.get_node(row, c).occupied:
+                while c >= 0 and self.board.get_node(row, c).tile:
                     word = self.board.get_node(row, c).char + word
                     c -= 1
 
                 # Look right
                 c = col + 1
-                while c < 15 and self.board.get_node(row, c).occupied:
+                while c < 15 and self.board.get_node(row, c).tile:
                     word += self.board.get_node(row, c).char
                     c += 1
 
@@ -318,7 +318,7 @@ class Word:
             row, col = location
             curr_node = board.get_node(row, col)
             if letter != None:
-                if curr_node.score_multiplier in ["TWS", "DWS", "TLS", "DLS"] and curr_node.occupied:
+                if curr_node.score_multiplier in ["TWS", "DWS", "TLS", "DLS"] and curr_node.tile:
                     if curr_node.score_multiplier != "": 
                         if curr_node.score_multiplier == "TWS":
                             fxws *= 3
@@ -331,9 +331,9 @@ class Word:
                         else:
                             xls *= 2
                 if self.direction == "right":
-                    while curr_node.up and curr_node.up.occupied:
+                    while curr_node.up and curr_node.up.tile:
                         curr_node = curr_node.up
-                    while curr_node.occupied:
+                    while curr_node.tile:
                         tile = curr_node.tile
                         letter_score = LETTER_VALUES[tile]
                         if curr_node.position == (row, col):
@@ -348,9 +348,9 @@ class Word:
                         sec_score += sec_val
                     total_score += (sec_score * sxws)
                 else:
-                    while curr_node.left and curr_node.left.occupied:
+                    while curr_node.left and curr_node.left.tile:
                         curr_node = curr_node.left
-                    while curr_node.occupied:
+                    while curr_node.tile:
                         tile = curr_node.tile
                         letter_score = LETTER_VALUES[tile]
                         if curr_node.position == (row, col):
