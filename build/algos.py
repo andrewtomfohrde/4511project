@@ -47,7 +47,7 @@ class ScrabbleAI(Player):
         elif strat_name == "GBFS":
             self.strategy = GBFS()    # strat
         elif strat_name == "BFS":
-            self.strategy = BFS()     #strat
+            self.strategy = BFS()     # strat
         else:
             self.strategy = MCTS()
             self.name = "AI_MCTS"
@@ -57,6 +57,23 @@ class ScrabbleAI(Player):
     def get_name(self):
         #Gets the AIplayer's name.
         return self.name
+
+    def make_move(self, board):
+        """Make the best move according to the current strategy"""
+        # Find all legal moves
+        legal_moves = self.find_all_moves(board)
+        
+        if not legal_moves:
+            return None, "skip"
+        
+        # Use the strategy to find the best move
+        # USE a "find_best_move" function WITHIN EACH STRAT
+        best_move = self.strategy.find_best_move(board, self.rack, legal_moves)
+        
+        if not best_move:
+            return None, "skip"
+        
+        return best_move, "play"
     
     def get_cross_checks(self, row, col, direction):
         """

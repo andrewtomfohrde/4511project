@@ -299,42 +299,34 @@ class Game:
 
     def turn(self, player, board, bag):
         """
-        Begins a turn, by displaying the current board, getting the information to play a turn,
-        and creates a recursive loop to allow the next person to play.
+        Handle a player's turn
         """
         if (self.skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
-            print("\nRound " + str(self.round_number) + ": " + player.get_name() + "'s turn \n")
+            print(f"\nRound {self.round_number}: {player.get_name()}'s turn \n")
             print(board.get_board())
-            print("\n" + player.get_name() + "'s Letter Rack: " + player.get_rack_str())
+            print(f"\n{player.get_name()}'s Letter Rack: {player.get_rack_str()}")
 
-            # === AI PLAYER LOGIC ===
-            if player.get_name().upper() in ["AI", "AI_MCTS", "AI_Beam", "AI_GBFS", "AI_AStar"] :
-                print("[AI is thinking...]")
-
-                legal_moves = player.find_all_moves()
-
-                if not legal_moves:
-                    print("AI has no valid moves. Skipping turn.")
+            # Check if the player is an AI
+            if isinstance(player, ScrabbleAI):
+                print(f"[{player.get_name()} is thinking...]")
+                
+                # Get AI's move
+                best_move, action = player.make_move(board)
+                
+                if action == "skip":
+                    print(f"{player.get_name()} has no valid moves. Skipping turn.")
                     self.skipped_turns += 1
                 else:
-                    initial_state = {
-                        'board': board,
-                        'rack': player.rack,
-                        'legal_moves': legal_moves,
-                        'player': player
-                    }
-
-                    best_move = monte_carlo_tree_search(initial_state, iterations=500)
-
                     word_to_play = best_move['word']
-                    location = list(best_move['position'])
+                    location = best_move['position']
                     direction = best_move['direction']
-
-                    print(f"AI plays: {word_to_play} at {location} going {direction}")
-
+                    
+                    print(f"{player.get_name()} plays: {word_to_play} at {location} going {direction}")
+                    
+                    # Create and validate the word
                     word = Word(word_to_play, location, player, direction, board)
-
                     valid, placed = word.check_word()
+                    
                     if valid:
                         board.place_word(word_to_play, location, direction, player, placed)
                         word_score = word.calculate_word_score(placed)
@@ -342,23 +334,22 @@ class Game:
                         player.increase_score(word_score)
                         self.skipped_turns = 0
                     else:
-                        print("AI attempted invalid word. Skipping.")
+                        print(f"{player.get_name()} attempted invalid word. Skipping.")
                         self.skipped_turns += 1
-
-            # === HUMAN PLAYER LOGIC ===
+            
+            # Human player's turn
             else:
                 placed = []
                 checked = False
                 while not checked:
-                    # print("\n" + player.get_name() + "'s Letter Rack: " + player.get_rack_str())
                     word_to_play = input("Word to play: ")
                     
                     # Check if player wants to skip turn
-                    if word_to_play.lower() == "skip":
+                    if word_to_play.lower() == "":
                         print(f"{player.get_name()} skips their turn.")
                         self.skipped_turns += 1
                         checked = True
-                        continue
+                        break
                         
                     location = []
                     col = input("Column number: ")
@@ -371,6 +362,7 @@ class Game:
 
                     word = Word(word_to_play, location, player, direction, board)
 
+                    # Handle blank tiles
                     blank_positions = [m.start() for m in re.finditer('#', word_to_play)]
                     blank_tiles_values = []
                     if blank_positions:
@@ -386,7 +378,7 @@ class Game:
 
                     checked, placed = word.check_word()
                 
-                if checked and not word_to_play.lower() == "skip":
+                if checked and not word_to_play.lower() in "":
                     success = board.place_word(word_to_play, location, direction, player, placed)
                     word_score = word.calculate_word_score(placed)
                     if success:
@@ -397,8 +389,9 @@ class Game:
                         print("Failed to place word. Skipping turn.")
                         self.skipped_turns += 1
 
-            print("\n" + player.get_name() + "'s score is: " + str(player.get_score()))
+            print(f"\n{player.get_name()}'s score is: {player.get_score()}")
 
+            # Determine next player
             if self.players.index(player) != (len(self.players) - 1):
                 next_player = self.players[self.players.index(player) + 1]
             else:
@@ -412,115 +405,6 @@ class Game:
             self.turn(next_player, board, bag)
         else:
             self.end_game()
-
-    # def turn(self, player, board, bag):
-    #     """
-    #     Handle a player's turn
-    #     """
-    #     if (self.skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
-    #         print(f"\nRound {self.round_number}: {player.get_name()}'s turn \n")
-    #         print(board.get_board())
-    #         print(f"\n{player.get_name()}'s Letter Rack: {player.get_rack_str()}")
-
-    #         # Check if the player is an AI
-    #         if isinstance(player, ScrabbleAI):
-    #             print(f"[{player.get_name()} is thinking...]")
-                
-    #             # Get AI's move
-    #             best_move, action = player.make_move(board)
-                
-    #             if action == "skip":
-    #                 print(f"{player.get_name()} has no valid moves. Skipping turn.")
-    #                 self.skipped_turns += 1
-    #             else:
-    #                 word_to_play = best_move['word']
-    #                 location = best_move['position']
-    #                 direction = best_move['direction']
-                    
-    #                 print(f"{player.get_name()} plays: {word_to_play} at {location} going {direction}")
-                    
-    #                 # Create and validate the word
-    #                 word = Word(word_to_play, location, player, direction, board)
-    #                 valid, placed = word.check_word()
-                    
-    #                 if valid:
-    #                     board.place_word(word_to_play, location, direction, player, placed)
-    #                     word_score = word.calculate_word_score(placed)
-    #                     print(f"Word '{word.word}' placed for {word_score} points!")
-    #                     player.increase_score(word_score)
-    #                     self.skipped_turns = 0
-    #                 else:
-    #                     print(f"{player.get_name()} attempted invalid word. Skipping.")
-    #                     self.skipped_turns += 1
-            
-    #         # Human player's turn
-    #         else:
-    #             placed = []
-    #             checked = False
-    #             while not checked:
-    #                 word_to_play = input("Word to play: ")
-                    
-    #                 # Check if player wants to skip turn
-    #                 if word_to_play.lower() == "skip":
-    #                     print(f"{player.get_name()} skips their turn.")
-    #                     self.skipped_turns += 1
-    #                     checked = True
-    #                     continue
-                        
-    #                 location = []
-    #                 col = input("Column number: ")
-    #                 row = input("Row number: ")
-    #                 if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
-    #                     location = [-1, -1]
-    #                 else:
-    #                     location = [int(row), int(col)]
-    #                 direction = input("Direction of word (right or down): ")
-
-    #                 word = Word(word_to_play, location, player, direction, board)
-
-    #                 # Handle blank tiles
-    #                 blank_positions = [m.start() for m in re.finditer('#', word_to_play)]
-    #                 blank_tiles_values = []
-    #                 if blank_positions:
-    #                     print(f"{len(blank_positions)} BLANK(S) DETECTED")
-    #                     for i, pos in enumerate(blank_positions):
-    #                         blank_value = input(f"Please enter the letter value of blank tile {i+1}: ").upper()
-    #                         blank_tiles_values.append(blank_value)
-    #                     modified_word = list(word_to_play)
-    #                     for i, pos in enumerate(blank_positions):
-    #                         modified_word[pos] = blank_tiles_values[i]
-    #                     new_word = ''.join(modified_word)
-    #                     word.set_word(new_word)
-
-    #                 checked, placed = word.check_word()
-                
-    #             if checked and not word_to_play.lower() == "skip":
-    #                 success = board.place_word(word_to_play, location, direction, player, placed)
-    #                 word_score = word.calculate_word_score(placed)
-    #                 if success:
-    #                     print(f"Word '{word.word}' placed for {word_score} points!")
-    #                     player.increase_score(word_score)
-    #                     self.skipped_turns = 0
-    #                 else:
-    #                     print("Failed to place word. Skipping turn.")
-    #                     self.skipped_turns += 1
-
-    #         print(f"\n{player.get_name()}'s score is: {player.get_score()}")
-
-    #         # Determine next player
-    #         if self.players.index(player) != (len(self.players) - 1):
-    #             next_player = self.players[self.players.index(player) + 1]
-    #         else:
-    #             next_player = self.players[0]
-    #             self.round_number += 1
-
-    #         # Refill player's rack
-    #         player.rack.replenish_rack()
-            
-    #         # Recursive call for next player's turn
-    #         self.turn(next_player, board, bag)
-    #     else:
-    #         self.end_game()
 
     def start_game(self):
         """Start a game with human players only"""
