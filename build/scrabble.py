@@ -1,7 +1,5 @@
 from random import shuffle
 import re
-import copy
-from word_generator import load_dictionary, get_possible_words
 from dictionarytrie import DictionaryTrie
 from word import Word, load_dictionary_from_file
 from algos import ScrabbleAI, MCTS, BeamSearchScrabble
@@ -40,34 +38,6 @@ LETTER_VALUES = {"A": 1,
                  "Y": 4,
                  "Z": 10,
                  "#": 0}
-
-# def load_dictionary_from_file(file_path):
-#     """
-#     Load dictionary from a file and create a trie data structure.
-#     Args:
-#         file_path: Path to the dictionary file
-#     Returns:
-#         A DictionaryTrie object containing all words from the file
-#     """
-#     dictionary = DictionaryTrie()
-    
-#     try:
-#         with open(file_path, 'r') as file:
-#             for line in file:
-#                 # Strip whitespace and ignore empty lines
-#                 word = line.strip()
-#                 if word:
-#                     dictionary.add_word(word)
-        
-#         print(f"Successfully loaded dictionary from {file_path}")
-#         return dictionary
-    
-#     except FileNotFoundError:
-#         print(f"Error: Dictionary file not found at {file_path}")
-#         return None
-#     except Exception as e:
-#         print(f"Error loading dictionary: {str(e)}")
-#         return None
 
 class ScrabbleBoard:
     class BoardNode(object):
@@ -323,6 +293,10 @@ class Game:
         self.skipped_turns = 0
         self.dictionary = dict
 
+    def add_player(self, player):
+        """Add a player to the game"""
+        self.players.append(player)
+
     def turn(self, player, board, bag):
         """
         Begins a turn, by displaying the current board, getting the information to play a turn,
@@ -336,9 +310,6 @@ class Game:
             # === AI PLAYER LOGIC ===
             if player.get_name().upper() in ["AI", "AI_MCTS", "AI_Beam", "AI_GBFS", "AI_AStar"] :
                 print("[AI is thinking...]")
-
-                if self.dictionary is None:
-                    self.dictionary = load_dictionary("scrabbledict.txt")
 
                 legal_moves = player.find_all_moves()
 
@@ -442,83 +413,162 @@ class Game:
         else:
             self.end_game()
 
+    # def turn(self, player, board, bag):
+    #     """
+    #     Handle a player's turn
+    #     """
+    #     if (self.skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
+    #         print(f"\nRound {self.round_number}: {player.get_name()}'s turn \n")
+    #         print(board.get_board())
+    #         print(f"\n{player.get_name()}'s Letter Rack: {player.get_rack_str()}")
+
+    #         # Check if the player is an AI
+    #         if isinstance(player, ScrabbleAI):
+    #             print(f"[{player.get_name()} is thinking...]")
+                
+    #             # Get AI's move
+    #             best_move, action = player.make_move(board)
+                
+    #             if action == "skip":
+    #                 print(f"{player.get_name()} has no valid moves. Skipping turn.")
+    #                 self.skipped_turns += 1
+    #             else:
+    #                 word_to_play = best_move['word']
+    #                 location = best_move['position']
+    #                 direction = best_move['direction']
+                    
+    #                 print(f"{player.get_name()} plays: {word_to_play} at {location} going {direction}")
+                    
+    #                 # Create and validate the word
+    #                 word = Word(word_to_play, location, player, direction, board)
+    #                 valid, placed = word.check_word()
+                    
+    #                 if valid:
+    #                     board.place_word(word_to_play, location, direction, player, placed)
+    #                     word_score = word.calculate_word_score(placed)
+    #                     print(f"Word '{word.word}' placed for {word_score} points!")
+    #                     player.increase_score(word_score)
+    #                     self.skipped_turns = 0
+    #                 else:
+    #                     print(f"{player.get_name()} attempted invalid word. Skipping.")
+    #                     self.skipped_turns += 1
+            
+    #         # Human player's turn
+    #         else:
+    #             placed = []
+    #             checked = False
+    #             while not checked:
+    #                 word_to_play = input("Word to play: ")
+                    
+    #                 # Check if player wants to skip turn
+    #                 if word_to_play.lower() == "skip":
+    #                     print(f"{player.get_name()} skips their turn.")
+    #                     self.skipped_turns += 1
+    #                     checked = True
+    #                     continue
+                        
+    #                 location = []
+    #                 col = input("Column number: ")
+    #                 row = input("Row number: ")
+    #                 if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
+    #                     location = [-1, -1]
+    #                 else:
+    #                     location = [int(row), int(col)]
+    #                 direction = input("Direction of word (right or down): ")
+
+    #                 word = Word(word_to_play, location, player, direction, board)
+
+    #                 # Handle blank tiles
+    #                 blank_positions = [m.start() for m in re.finditer('#', word_to_play)]
+    #                 blank_tiles_values = []
+    #                 if blank_positions:
+    #                     print(f"{len(blank_positions)} BLANK(S) DETECTED")
+    #                     for i, pos in enumerate(blank_positions):
+    #                         blank_value = input(f"Please enter the letter value of blank tile {i+1}: ").upper()
+    #                         blank_tiles_values.append(blank_value)
+    #                     modified_word = list(word_to_play)
+    #                     for i, pos in enumerate(blank_positions):
+    #                         modified_word[pos] = blank_tiles_values[i]
+    #                     new_word = ''.join(modified_word)
+    #                     word.set_word(new_word)
+
+    #                 checked, placed = word.check_word()
+                
+    #             if checked and not word_to_play.lower() == "skip":
+    #                 success = board.place_word(word_to_play, location, direction, player, placed)
+    #                 word_score = word.calculate_word_score(placed)
+    #                 if success:
+    #                     print(f"Word '{word.word}' placed for {word_score} points!")
+    #                     player.increase_score(word_score)
+    #                     self.skipped_turns = 0
+    #                 else:
+    #                     print("Failed to place word. Skipping turn.")
+    #                     self.skipped_turns += 1
+
+    #         print(f"\n{player.get_name()}'s score is: {player.get_score()}")
+
+    #         # Determine next player
+    #         if self.players.index(player) != (len(self.players) - 1):
+    #             next_player = self.players[self.players.index(player) + 1]
+    #         else:
+    #             next_player = self.players[0]
+    #             self.round_number += 1
+
+    #         # Refill player's rack
+    #         player.rack.replenish_rack()
+            
+    #         # Recursive call for next player's turn
+    #         self.turn(next_player, board, bag)
+    #     else:
+    #         self.end_game()
+
     def start_game(self):
-        """Begins a standard human vs human game and calls the turn function."""
+        """Start a game with human players only"""
         board = ScrabbleBoard()
         bag = Bag()
-
-        # Asks the player for the number of players.
-        num_of_players = 2
-
-        # Welcomes players to the game and allows players to choose their name.
-        print("\nWelcome to Scrabble! Please enter the names of the players below.")
-        self.players = []
-        for i in range(num_of_players):
-            self.players.append(Player(bag))
-            self.players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
-
-        # Sets the default values
-        self.round_number = 1
-        self.skipped_turns = 0
-        current_player = self.players[0]
-        self.turn(current_player, board, bag)
+        
+        # Create players
+        num_players = int(input("Enter number of players (2-4): "))
+        for i in range(min(num_players, 4)):
+            player = Player(bag)
+            player.set_name(input(f"Enter name for player {i+1}: "))
+            self.add_player(player)
+        
+        # Start the game with the first player
+        self.turn(self.players[0], board, bag)
 
     def start_game_vs_ai(self):
-        """Begins a game between human and AI and calls the turn function."""
+        """Start a game with one human player and one AI player"""
         board = ScrabbleBoard()
         bag = Bag()
-        self.players = []
-
-        # Welcomes players to the game
-        print("\nWelcome to Scrabble! Let's play against the AI.")
-
+        
         # Create human player
-        human_player = Player(bag)
-        human_player.set_name(input("Please enter your name: "))
-        self.players.append(human_player)
-
+        human = Player(bag)
+        human.set_name(input("Enter your name: "))
+        self.add_player(human)
+        
         # Create AI player
-        ai_type = input(f"Select AI type for player (MCTS/Beam/AStar/GBFS): ")
-        ai_player = ScrabbleAI("", dictionary, board, bag, ai_type)
-        ai_player.set_name(f"AI_{ai_type}")
-        self.players.append(ai_player)
-
-        # Sets the default values
-        self.round_number = 1
-        self.skipped_turns = 0
-        current_player = self.players[0]
-        self.turn(current_player, board, bag)
+        ai_strategy = input("Select AI strategy (MCTS/BEAM/ASTAR/GBFS/BFS): ").upper()
+        ai = ScrabbleAI(self.dictionary, board, bag, ai_strategy)
+        self.add_player(ai)
+        
+        # Start the game with the human player
+        self.turn(self.players[0], board, bag)
 
     def start_ai_game(self):
-        """Begins a game between two AI players."""
+        """Start a game with AI players only"""
         board = ScrabbleBoard()
         bag = Bag()
-        self.players = []
-
-        # Welcomes to the AI vs AI game
-        print("\nWelcome to Scrabble AI vs AI match!")
         
-        # Create two AI players
-        for i in range(2):
-            valid = False
-            while not valid:
-                ai_type = input(f"Select AI type for player {i+1} (MCTS/Beam/AStar/GBFS): ")
-                if ai_type in ["MCTS", "Beam", "AStar", "GBFS"]:
-                    valid = True
-                else:
-                    quit = input("Invalid input. To quit, enter 'q': ").strip().lower() == 'q'
-                    if quit:
-                        return
-
-            ai_player = ScrabbleAI(dictionary, board, bag, ai_type)
-            ai_player.set_name(f"AI_{ai_type}")
-            self.players.append(ai_player)
-
-        # Sets the default values
-        self.round_number = 1
-        self.skipped_turns = 0
-        current_player = self.players[0]
-        self.turn(current_player, board, bag)
+        # Create AI players
+        num_ais = int(input("Enter number of AI players (2-4): "))
+        for i in range(min(num_ais, 4)):
+            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/AStar/GBFS): ").upper()
+            ai = ScrabbleAI(self.dictionary, bag, ai_strategy)
+            self.add_player(ai)
+        
+        # Start the game with the first AI
+        self.turn(self.players[0], board, bag)
 
     def end_game(self):
         """Forces the game to end when the bag runs out of tiles or too many skipped turns."""
@@ -553,19 +603,22 @@ class Game:
 
 def main():
     dict_file_path = "build/scrabbledict.txt"
-    global dictionary
     dictionary = load_dictionary_from_file(dict_file_path)
-    scrabble = Game(dictionary)
-    ai_game = input("Would you like to play against an AI? (y/n): ").strip().lower() == 'y'
-    if ai_game:
-        dict_file_path = "scrabbledict.txt"
-        ai_num = input("Do you want AI vs AI? (y/n): ").strip().lower() == 'y'
-        if ai_num:
-            scrabble.start_ai_game()
-        else:
-            scrabble.start_game_vs_ai()
-    else: 
-        scrabble.start_game()
+    
+    game = Game(dictionary)
+    
+    print("Welcome to Scrabble!")
+    game_type = input("Select game type:\n1. Human vs Human\n2. Human vs AI\n3. AI vs AI\nChoice: ")
+    
+    if game_type == "1":
+        game.start_game()
+    elif game_type == "2":
+        game.start_game_vs_ai()
+    elif game_type == "3":
+        game.start_ai_game()
+    else:
+        print("Invalid choice. Starting Human vs Human game by default.")
+        game.start_game()
 
 
 if __name__ == "__main__":

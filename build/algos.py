@@ -1,5 +1,6 @@
 from dictionarytrie import DictionaryTrie
 from player import Player, Rack
+from word import Word
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
@@ -35,24 +36,27 @@ class ScrabbleAI(Player):
         super().__init__(bag)  # Initialize the Player attributes
         self.dict = dictionary
         self.board = board
-        self.strategy = strategy
-        self.valid_moves = []
-        self.direction = None
-    
-    def get_node_at(self, row, col):
-        """
-        Get the board node at the specified position.
+        self.set_strat(strategy)
+
+    def set_strat(self, strat_name):
+        self.name = f"AI_{strat_name}"
+        if strat_name == "Beam":
+            self.strategy = BEAM()    # strat
+        elif strat_name == "Astar":
+            self.strategy = ASTAR()   # strat
+        elif strat_name == "GBFS":
+            self.strategy = GBFS()    # strat
+        elif strat_name == "BFS":
+            self.strategy = BFS()     #strat
+        else:
+            self.strategy = MCTS()
+            self.name = "AI_MCTS"
         
-        Args:
-            row, col: Position coordinates
-            
-        Returns:
-            BoardNode at the position or None if out of bounds
-        """
-        try:
-            return self.board.get_node(row, col)
-        except (IndexError, AttributeError):
-            return None
+        self.name = f"AI_{strat_name}"
+
+    def get_name(self):
+        #Gets the AIplayer's name.
+        return self.name
     
     def get_cross_checks(self, row, col, direction):
         """
@@ -68,11 +72,11 @@ class ScrabbleAI(Player):
         """
         valid_letters = set(LETTER_VALUES)  # Start with all letters
         
-        node = self.get_node_at(row, col)
+        node = self.board.get_node(row, col)
         if not node:
             return set()  # Out of bounds
             
-        if node.occupied:
+        if node.tile:
             # If the square is already occupied, only the existing letter is valid
             return {node.tile}
         
@@ -80,10 +84,10 @@ class ScrabbleAI(Player):
         if direction == 'across':
             # Check for vertical constraints (words formed top-to-bottom)
             # If there's no tiles above or below, all letters are valid
-            node_up = self.get_node_at(row-1, col)
-            node_down = self.get_node_at(row+1, col)
+            node_up = self.board.get_node(row-1, col)
+            node_down = self.board.get_node(row+1, col)
             
-            if not (node_up and node_up.occupied) and not (node_down and node_down.occupied):
+            if not (node_up and node_up.tile) and not (node_down and node_down.tile):
                 return valid_letters
             
             # There's at least one adjacent tile vertically, so we need to check what vertical
@@ -94,8 +98,8 @@ class ScrabbleAI(Player):
             while True:
                 prev_row = start_row - 1
                 if prev_row >= 0:
-                    prev_node = self.get_node_at(prev_row, col)
-                    if prev_node and prev_node.occupied:
+                    prev_node = self.board.get_node(prev_row, col)
+                    if prev_node and prev_node.tile:
                         start_row = prev_row
                     else:
                         break
@@ -111,14 +115,14 @@ class ScrabbleAI(Player):
                 curr_row = start_row
                 
                 while curr_row < self.board.size:
-                    curr_node = self.get_node_at(curr_row, col)
+                    curr_node = self.board.get_node(curr_row, col)
                     if not curr_node:
                         break
                     
                     if curr_row == row:
                         # This is our test position
                         word += letter
-                    elif curr_node.occupied:
+                    elif curr_node.tile:
                         word += curr_node.tile
                     else:
                         break
@@ -138,10 +142,10 @@ class ScrabbleAI(Player):
         
         else:  # direction == 'down'
             # Similar logic for horizontal constraints when placing vertically
-            node_left = self.get_node_at(row, col-1)
-            node_right = self.get_node_at(row, col+1)
+            node_left = self.board.get_node(row, col-1)
+            node_right = self.board.get_node(row, col+1)
             
-            if not (node_left and node_left.occupied) and not (node_right and node_right.occupied):
+            if not (node_left and node_left.tile) and not (node_right and node_right.tile):
                 return valid_letters
             
             # Find the start of the potential horizontal word
@@ -149,8 +153,8 @@ class ScrabbleAI(Player):
             while True:
                 prev_col = start_col - 1
                 if prev_col >= 0:
-                    prev_node = self.get_node_at(row, prev_col)
-                    if prev_node and prev_node.occupied:
+                    prev_node = self.board.get_node(row, prev_col)
+                    if prev_node and prev_node.tile:
                         start_col = prev_col
                     else:
                         break
@@ -166,14 +170,14 @@ class ScrabbleAI(Player):
                 curr_col = start_col
                 
                 while curr_col < self.board.size:
-                    curr_node = self.get_node_at(row, curr_col)
+                    curr_node = self.board.get_node(row, curr_col)
                     if not curr_node:
                         break
                     
                     if curr_col == col:
                         # This is our test position
                         word += letter
-                    elif curr_node.occupied:
+                    elif curr_node.tile:
                         word += curr_node.tile
                     else:
                         break
@@ -255,8 +259,8 @@ class ScrabbleAI(Player):
             # Count empty squares to the left
             curr_col = col - 1
             while curr_col >= 0:
-                node = self.get_node_at(row, curr_col)
-                if node and not node.occupied:
+                node = self.board.get_node(row, curr_col)
+                if node and not node.tile:
                     limit += 1
                     curr_col -= 1
                 else:
@@ -265,8 +269,8 @@ class ScrabbleAI(Player):
             # Count empty squares above
             curr_row = row - 1
             while curr_row >= 0:
-                node = self.get_node_at(curr_row, col)
-                if node and not node.occupied:
+                node = self.board.get_node(curr_row, col)
+                if node and not node.tile:
                     limit += 1
                     curr_row -= 1
                 else:
@@ -304,7 +308,7 @@ class ScrabbleAI(Player):
     #         word_has_anchor: Whether the word uses an existing anchor point
     #     """
     #     # Check if we're still on the board
-    #     node = self.get_node_at(row, col)
+    #     node = self.board.get_node(row, col)
     #     if not node:
     #         # We've gone off the board, so check if we have a valid word
     #         if dict_node.is_terminal and word_has_anchor and partial_word:
@@ -313,7 +317,7 @@ class ScrabbleAI(Player):
     #         return
         
     #     # If this square is already occupied, we must use that letter
-    #     if node.occupied:
+    #     if node.tile:
     #         # Get the letter on this square
     #         letter = node.tile
             
@@ -394,7 +398,7 @@ class ScrabbleAI(Player):
             word_has_anchor: Whether the word uses an existing anchor point
         """
         # Check if we're still on the board
-        node = self.get_node_at(row, col)
+        node = self.board.get_node(row, col)
         if not node:
             # We've gone off the board, so check if we have a valid word
             if dict_node.is_terminal and word_has_anchor and partial_word:
@@ -403,7 +407,7 @@ class ScrabbleAI(Player):
             return
         
         # If this square is already occupied, we must use that letter
-        if node.occupied:
+        if node.tile:
             # Get the letter on this square
             letter = node.tile
             
@@ -485,8 +489,8 @@ class ScrabbleAI(Player):
         Returns:
             Boolean indicating if this is an anchor square
         """
-        node = self.get_node_at(row, col)
-        if not node or node.occupied:
+        node = self.board.get_node(row, col)
+        if not node or node.tile:
             return False
             
         # Check if this empty square is adjacent to any occupied square
@@ -498,8 +502,8 @@ class ScrabbleAI(Player):
         ]
         
         for adj_row, adj_col in adjacent_positions:
-            adj_node = self.get_node_at(adj_row, adj_col)
-            if adj_node and adj_node.occupied:
+            adj_node = self.board.get_node(adj_row, adj_col)
+            if adj_node and adj_node.tile:
                 return True
                 
         return False
@@ -555,7 +559,7 @@ class ScrabbleAI(Player):
         # First pass: calculate the main word score and any cross-word scores
         for position, letter in placed_tiles:
             row, col = position
-            node = self.get_node_at(row, col)
+            node = self.board.get_node(row, col)
             
             if not node:
                 continue
@@ -619,13 +623,13 @@ class ScrabbleAI(Player):
         # A cross-word is formed if there are adjacent tiles in the perpendicular direction
         if cross_direction == 'down':
             # Check for tiles above or below
-            if not (self.get_node_at(row-1, col) and self.get_node_at(row-1, col).occupied) and \
-               not (self.get_node_at(row+1, col) and self.get_node_at(row+1, col).occupied):
+            if not (self.board.get_node(row-1, col) and self.board.get_node(row-1, col).tile) and \
+               not (self.board.get_node(row+1, col) and self.board.get_node(row+1, col).tile):
                 return 0  # No cross-word formed
         else:  # cross_direction == 'right'
             # Check for tiles to the left or right
-            if not (self.get_node_at(row, col-1) and self.get_node_at(row, col-1).occupied) and \
-               not (self.get_node_at(row, col+1) and self.get_node_at(row, col+1).occupied):
+            if not (self.board.get_node(row, col-1) and self.board.get_node(row, col-1).tile) and \
+               not (self.board.get_node(row, col+1) and self.board.get_node(row, col+1).tile):
                 return 0  # No cross-word formed
         
         # A cross-word is formed, calculate its score
@@ -638,8 +642,8 @@ class ScrabbleAI(Player):
             # Find the topmost tile of the vertical word
             curr_row = row
             while curr_row > 0:
-                upper_node = self.get_node_at(curr_row-1, col)
-                if upper_node and upper_node.occupied:
+                upper_node = self.board.get_node(curr_row-1, col)
+                if upper_node and upper_node.tile:
                     curr_row -= 1
                 else:
                     break
@@ -647,7 +651,7 @@ class ScrabbleAI(Player):
             # Build the word from top to bottom
             start_row = curr_row
             while True:
-                curr_node = self.get_node_at(curr_row, col)
+                curr_node = self.board.get_node(curr_row, col)
                 if not curr_node:
                     break
                 
@@ -667,7 +671,7 @@ class ScrabbleAI(Player):
                         word_multiplier *= 3
                     elif curr_node.score_multiplier == "DWS":
                         word_multiplier *= 2
-                elif curr_node.occupied:
+                elif curr_node.tile:
                     curr_letter = curr_node.tile
                     letter_score = LETTER_VALUES[curr_letter]
                 else:
@@ -681,8 +685,8 @@ class ScrabbleAI(Player):
             # Find the leftmost tile of the horizontal word
             curr_col = col
             while curr_col > 0:
-                left_node = self.get_node_at(row, curr_col-1)
-                if left_node and left_node.occupied:
+                left_node = self.board.get_node(row, curr_col-1)
+                if left_node and left_node.tile:
                     curr_col -= 1
                 else:
                     break
@@ -690,7 +694,7 @@ class ScrabbleAI(Player):
             # Build the word from left to right
             start_col = curr_col
             while True:
-                curr_node = self.get_node_at(row, curr_col)
+                curr_node = self.board.get_node(row, curr_col)
                 if not curr_node:
                     break
                 
@@ -710,7 +714,7 @@ class ScrabbleAI(Player):
                         word_multiplier *= 3
                     elif curr_node.score_multiplier == "DWS":
                         word_multiplier *= 2
-                elif curr_node.occupied:
+                elif curr_node.tile:
                     curr_letter = curr_node.tile
                     letter_score = LETTER_VALUES[curr_letter]
                 else:
@@ -954,7 +958,7 @@ class BeamSearchScrabble:
             # Try each tile in the rack
             for i, tile in enumerate(remaining_rack):
                 # Skip if cell is already occupied
-                if current_node.occupied:
+                if current_node.tile:
                     continue
                     
                 # Create a new candidate with this tile placed
