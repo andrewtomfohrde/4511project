@@ -292,7 +292,7 @@ class Game:
                 # Get AI's move
                 best_move, action = player.make_move(board)
                 
-                if action == "skip":
+                if action == "skip" and not best_move:
                     print(f"{player.get_name()} has no valid moves. Skipping turn.")
                     self.skipped_turns += 1
                 else:

@@ -39,7 +39,7 @@ class ScrabbleAI(Player):
         self.board = board
 
     def set_strat(self, strat_name):
-        if strat_name in "BEAM", "ASTAR", "GBFS", "BFS":
+        if strat_name in ["BEAM", "ASTAR", "GBFS", "BFS"]:
             self.name = f"AI_{strat_name}"
         else:
             self.name = "AI_MCTS"
@@ -56,14 +56,14 @@ class ScrabbleAI(Player):
         legal_moves = find_all_moves(self.board, self.rack)
         
         if not legal_moves:
-            return None, ""
+            return None, "skip"
         
         # Use the strategy to find the best move
         # USE a "find_best_move" function WITHIN EACH STRAT
         best_move = self.get_best_move(self.board, self.rack, legal_moves)
         
         if not best_move:
-            return None, ""
+            return None, "skip"
         
         return best_move, "play"
     
@@ -113,9 +113,27 @@ class ScrabbleAI(Player):
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
     
 def get_beam_move(dictionary, board, rack, legal_moves):
+
     if not dictionary or not rack or not legal_moves or not board:
         return None, ""
     
+    ##width = 10
+    valid_moves = find_all_moves(board, rack)
+    move_tree = create_word_tree(valid_moves)
+    
+    
+def create_word_tree(moves):
+    move_tree = DictionaryTrie()
+    for word, pos, dir, placed, score in moves:
+        check = move_tree.get_node(word)
+        if check and check.score < score:
+            check.set_attr(word, pos, dir, score)
+        else:
+            curr = move_tree.add_word(word)
+            curr.set_attr(word, pos, dir, score)
+    return move_tree
+
+
     
     
 def find_anchor_points(board):
@@ -163,7 +181,7 @@ def get_cross_checks(board, dict, row, col, direction):
         return {node.tile}
     
     # If this is an empty square, check what cross-words would be formed
-    if direction == 'across':
+    if direction == "right":
         # Check for vertical constraints (words formed top-to-bottom)
         # If there's no tiles above or below, all letters are valid
         node_up = board.get_node(row-1, col)
@@ -291,11 +309,11 @@ def find_all_moves(board, rack):
     for row, col in anchor_points:
         # Try horizontal placement
         direction = "right"
-        right_moves = find_moves_at_anchor(row, col, rack, 'right')
+        right_moves = find_moves_at_anchor(row, col, rack, "right")
         
         # Try vertical placement
         direction = "down"
-        down_moves = find_moves_at_anchor(row, col, rack, 'down')
+        down_moves = find_moves_at_anchor(row, col, rack, "down")
     
     valid_moves = right_moves + down_moves
     
@@ -318,7 +336,7 @@ def find_moves_at_anchor(board, anchor_row, anchor_col, rack, direction, valid_m
     # Try each possible prefix length
     for prefix_length in range(prefix_limit + 1):
         # Calculate the starting position for this prefix length
-        if direction == 'right':
+        if direction == "right":
             start_row, start_col = anchor_row, anchor_col - prefix_length
         else:  # direction == 'down'
             start_row, start_col = anchor_row - prefix_length, anchor_col
@@ -339,7 +357,7 @@ def calculate_prefix_limit(board, row, col, direction):
     """
     limit = 0
     
-    if direction == 'right':
+    if direction == "right":
         # Count empty squares to the left
         curr_col = col - 1
         while curr_col >= 0:
@@ -473,7 +491,7 @@ def generate_moves_recursive(partial_word, dict_node, row, col, available_rack, 
 
 def get_next_position(row, col, direction):
     """Get the next position based on the current direction."""
-    if direction == 'right':
+    if direction == "right":
         return row, col + 1
     else:  # direction == 'down'
         return row + 1, col
@@ -586,7 +604,7 @@ def calculate_cross_word_score(board, row, col, letter, direction):
     """
     # If we're placing horizontally, check for vertical cross-words
     # If we're placing vertically, check for horizontal cross-words
-    cross_direction = 'down' if direction == 'right' else 'right'
+    cross_direction = 'down' if direction == "right" else 'right'
     
     # Check if this letter forms a cross-word
     # A cross-word is formed if there are adjacent tiles in the perpendicular direction
