@@ -36,12 +36,12 @@ class Tile:
     """
     def __init__(self, letter, letter_values):
         #Initializes the tile class. Takes the letter as a string, and the dictionary of letter values as arguments.
-        self.letter = letter.upper() # letter tile represents (USED FOR BLANKS)
+        self.letter = letter.upper() # tile itself
         if self.letter in letter_values:
             self.score = letter_values[self.letter]
         else:
             self.score = 0
-        self.char = letter.upper() #tile itself
+        self.char = letter.upper() # what tile represents
 
     def get_char(self):
         #Returns what char the tile represents (ex. blank = A)

@@ -2,6 +2,8 @@ from dictionarytrie import DictionaryTrie
 from player import Player
 from word import Word
 import math
+import random
+import copy
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
@@ -116,25 +118,116 @@ def get_beam_move(dictionary, board, rack, legal_moves):
 
     if not dictionary or not rack or not legal_moves or not board:
         return None, ""
-    
-    ##width = 10
     valid_moves = find_all_moves(board, rack)
-    move_tree = create_word_tree(valid_moves)
+    move_tree = create_word_tree(valid_moves, rack)
+    best_move = beam_search(move_tree, 10)
+
     
-    
-def create_word_tree(moves):
+def create_word_tree(moves, rack):
     move_tree = DictionaryTrie()
+    tile_score = 0
     for word, pos, dir, placed, score in moves:
         check = move_tree.get_node(word)
-        if check and check.score < score:
-            check.set_attr(word, pos, dir, score)
+        new_score = score - rack_score(placed, rack)
+        if check and check.score < new_score:
+            check.set_attr(word, pos, dir, new_score)
         else:
             curr = move_tree.add_word(word)
-            curr.set_attr(word, pos, dir, score)
+            curr.set_attr(word, pos, dir, new_score)
     return move_tree
 
 
+def rack_score(placed, rack):
+    score = 0
+    con = 0
+    vow = 0
+    rack_arr = []
+    for tile in rack:
+        rack_arr.append(tile.get_char())
+        
+    for location, letter in placed:
+        if letter in rack_arr:
+            rack_arr.remove(letter)
+            if letter == "#":
+                score += 1
+            elif letter in ['A', 'E', 'I', 'O', 'U']:
+                vow += 1
+            else:
+                con += 1
     
+    diff = con - vow
+    if abs(diff) <= 1:
+        score += 2
+    elif abs(diff) >= 5:
+        score -= 3
+    elif abs(diff) >= 4:
+        score -= 2
+    elif abs(diff) >= 3:
+        score -= 1
+    
+    return score
+
+def beam_search(move_tree, beam_width=10, beam_depth):
+    """
+    Perform beam search on the word tree to find the best move.
+    
+    The beam search algorithm works by:
+    1. Starting at the root of the tree
+    2. Evaluating all child nodes
+    3. Keeping only the top N (beam_width) candidates
+    4. Continuing this process until leaf nodes are reached
+    5. Returning the highest scoring move found
+    
+    Args:
+        move_tree: DictionaryTrie containing moves
+        beam_width: Number of candidates to keep at each level
+        
+    Returns:
+        dict: Best move information or None if no moves found
+    """
+    # Start at the root node
+    root = move_tree.root
+    
+    # Initialize the beam with the root node
+    beam = [root]
+    
+    # Best move found so far
+    best_move = None
+    best_score = 0
+    
+    # Continue until the beam is empty
+    while beam:
+        # Collect all children of nodes in the current beam
+        candidates = []
+        
+        for node in beam:
+            # If this node represents a complete word with attributes
+            if node.word and node.score:
+                # Check if this is the best move found so far
+                if node.score > best_score:
+                    best_score = node.score
+                    best_move = {
+                        'word': node.word,
+                        'position': node.position,
+                        'direction': node.direction,
+                        'score': node.score
+                    }
+            
+            # Add all children to candidates
+            for letter, child_node in node.children.items():
+                candidates.append(child_node)
+        
+        # If no candidates, we've reached the end of the tree
+        if not candidates:
+            break
+        
+        # Sort candidates by score (if available) or depth in the tree
+        candidates.sort(key=lambda x: getattr(x, 'score', 0), reverse=True)
+        
+        # Keep only the top beam_width candidates
+        beam = candidates[:beam_width]
+    
+    return best_move
     
 def find_anchor_points(board):
 
@@ -308,20 +401,17 @@ def find_all_moves(board, rack):
     # Find moves for each anchor point in both directions
     for row, col in anchor_points:
         # Try horizontal placement
-        direction = "right"
         right_moves = find_moves_at_anchor(row, col, rack, "right")
         
         # Try vertical placement
-        direction = "down"
         down_moves = find_moves_at_anchor(row, col, rack, "down")
     
     valid_moves = right_moves + down_moves
     
     # Sort moves by score (highest first)
-    valid_moves.sort(key=lambda move: move['score'], reverse=True)
     return valid_moves
 
-def find_moves_at_anchor(board, anchor_row, anchor_col, rack, direction, valid_moves):
+def find_moves_at_anchor(board, anchor_row, anchor_col, rack, direction):
     """
     Find all valid moves that go through a specific anchor point in a given direction.
     
@@ -330,6 +420,7 @@ def find_moves_at_anchor(board, anchor_row, anchor_col, rack, direction, valid_m
         rack: Available letters
         direction: 'right' or 'down'
     """
+    valid_moves = []
     # Find the maximum prefix length (how far we can go before the anchor)
     prefix_limit = calculate_prefix_limit(board, anchor_row, anchor_col, direction)
     
@@ -343,6 +434,8 @@ def find_moves_at_anchor(board, anchor_row, anchor_col, rack, direction, valid_m
         
         # Find all words that can be placed starting at this position
         generate_moves(start_row, start_col, rack, direction, prefix_length, board, valid_moves) ############### what to set this to?
+    
+    return valid_moves
 
 def calculate_prefix_limit(board, row, col, direction):
     """
@@ -421,7 +514,7 @@ def generate_moves_recursive(partial_word, dict_node, row, col, available_rack, 
     # If this square is already occupied, we must use that letter
     if node.tile:
         # Get the letter on this square
-        letter = node.tile
+        letter = node.tile.char
         
         # Check if this letter continues a valid path in our dictionary
         next_node = dict_node.get_child(letter)
@@ -457,7 +550,7 @@ def generate_moves_recursive(partial_word, dict_node, row, col, available_rack, 
         
         # Try each valid letter
         for tile in valid_letters:
-            letter = tile.letter
+            letter = tile.get_letter()
             # Check if this letter continues a valid path in our dictionary
             next_node = dict_node.get_child(letter)
             if next_node:
@@ -481,13 +574,36 @@ def generate_moves_recursive(partial_word, dict_node, row, col, available_rack, 
                     direction,
                     max(0, remaining_prefix - 1),
                     placed_tiles + [((row, col), letter)],
-                    word_has_anchor or remaining_prefix == 0  # A tile at the anchor counts
+                    word_has_anchor or remaining_prefix == 0, # A tile at the anchor counts
+                    valid_moves
+                )
+            elif letter == "#":
+                rack_copy = available_rack.copy()
+                rack_copy.remove(letter)
+                
+                # Calculate next position
+                next_row, next_col = get_next_position(row, col, direction)
+                
+                for char in dict_node.children:
+                    # Continue recursively
+                    generate_moves_recursive(
+                        partial_word + char,
+                        next_node,
+                        next_row,
+                        next_col,
+                        rack_copy,
+                        board,
+                        direction,
+                        max(0, remaining_prefix - 1),
+                        placed_tiles + [((row, col), char)],
+                        word_has_anchor or remaining_prefix == 0,  # A tile at the anchor counts
+                        valid_moves
                 )
         
         # If we have a valid word so far and we've used an anchor, record it
         if dict_node.is_terminal and word_has_anchor and partial_word:
             ### ADD TO List of valid moves
-            record_move(partial_word, placed_tiles, direction, valid_moves)
+            record_move(partial_word, placed_tiles, direction, valid_moves, board)
 
 def get_next_position(row, col, direction):
     """Get the next position based on the current direction."""
@@ -496,7 +612,7 @@ def get_next_position(row, col, direction):
     else:  # direction == 'down'
         return row + 1, col
 
-def record_move(word, placed_tiles, direction, valid_moves):
+def record_move(word, placed_tiles, direction, valid_moves, board):
     """
     Record a valid move in the list of valid moves.
     
@@ -506,7 +622,7 @@ def record_move(word, placed_tiles, direction, valid_moves):
         direction: 'right' or 'down'
     """
     # Calculate score for this placement
-    score = calculate_placement_score(placed_tiles)
+    score = calculate_placement_score(placed_tiles, board, direction)
     
     # Get the starting position of the word
     if placed_tiles:
@@ -525,7 +641,7 @@ def record_move(word, placed_tiles, direction, valid_moves):
     
     valid_moves.append(move)
 
-def calculate_placement_score(placed_tiles, board, direction, ):
+def calculate_placement_score(placed_tiles, board, direction):
     """
     Calculate the score for a set of placed tiles.
     
@@ -792,192 +908,4 @@ def monte_carlo_tree_search(initial_state, iterations=1000):
     best = max(root.children, key=lambda c: c.visits)
     return best.move
 
-class BEAM:
-    def __init__(self, rack, board, beam_width=10, max_depth=7):
-        """
-        Initialize the beam search algorithm.
-        
-        Parameters:
-        - game: Your Scrabble game instance
-        - beam_width: Number of candidates to keep at each step
-        - max_depth: Maximum number of tiles to place in a single move
-        """
-        self.rack = rack
-        self.board = board
-        self.beam_width = beam_width
-        self.max_depth = max_depth
-    
-    def find_best_move(self):
-        """
-        Find the best move given the current rack and board state.
-        
-        Parameters:
-        - rack: List of tiles in the player's rack
-        
-        Returns:
-        - best_move: The highest scoring valid move found
-        """
-        initial_candidates = [{'placed_tiles': [], 'score': 0, 'rack': self.rack.copy()}]
-        best_move = None
-        best_score = 0
-        
-        # Identify all anchor points (empty cells adjacent to existing tiles)
-        anchor_points = self.board.find_anchor_points()
-        
-        # Try starting a word from each anchor point
-        for anchor in anchor_points:
-            candidates = initial_candidates.copy()
-            
-            for depth in range(self.max_depth):
-                new_candidates = []
-                
-                for candidate in candidates:
-                    # Generate next possible moves from this candidate
-                    next_moves = self._generate_next_moves(candidate, anchor)
-                    new_candidates.extend(next_moves)
-                
-                # Keep only the beam_width best candidates
-                candidates = sorted(new_candidates, key=lambda x: x['score'], reverse=True)[:self.beam_width]
-                
-                # Update best move if we found a better one
-                for candidate in candidates:
-                    if candidate['score'] > best_score and self._is_valid_move(candidate):
-                        best_move = candidate
-                        best_score = candidate['score']
-            
-        return best_move
-    
-    def generate_moves(self, candidate, anchor):
-        """
-        Generate all possible next moves from the current candidate.
-        
-        Parameters:
-        - candidate: Current candidate move
-        - anchor: Position to start the word
-        
-        Returns:
-        - List of new candidate moves
-        """
-        new_candidates = []
-        remaining_rack = candidate['rack']
-        
-        # Get node at anchor position
-        node = self._get_node_at_position(anchor)
-        
-        # Try each direction (right, down)
-        for direction in ['right', 'down']:
-            current_node = node
-            
-            # Skip if we can't go in this direction
-            if not getattr(current_node, direction):
-                continue
-                
-            # Try each tile in the rack
-            for i, tile in enumerate(remaining_rack):
-                # Skip if cell is already occupied
-                if current_node.tile:
-                    continue
-                    
-                # Create a new candidate with this tile placed
-                new_rack = remaining_rack.copy()
-                new_rack.pop(i)
-                
-                new_placed = candidate['placed_tiles'].copy()
-                new_placed.append((current_node.position, tile))
-                
-                # Calculate the score for this placement
-                new_score = self._calculate_placement_score(new_placed)
-                
-                new_candidates.append({
-                    'placed_tiles': new_placed,
-                    'score': new_score,
-                    'rack': new_rack
-                })
-                
-            # Move to the next node in the direction
-            current_node = getattr(current_node, direction)
-        
-        return new_candidates
-    
-    def _get_node_at_position(self, position):
-        """Get the node at the specified board position."""
-        current = self.game.start_node
-        row, col = position
-        
-        # Move down to the correct row
-        for _ in range(row):
-            if current.down:
-                current = current.down
-        
-        # Move right to the correct column
-        for _ in range(col):
-            if current.right:
-                current = current.right
-                
-        return current
-    
-    def _calculate_placement_score(self, placed_tiles):
-        """
-        Calculate the score for a set of placed tiles.
-        This should leverage your existing calculate_word_score function.
-        """
-        # This is a placeholder - you'll need to implement this based on your game's scoring logic
-        # You'll want to identify all words formed by these placements and sum their scores
-        
-        # For each placed tile, check if it forms words horizontally and vertically
-        total_score = 0
-        words_formed = self._identify_words_formed(placed_tiles)
-        
-        for word in words_formed:
-            if self.check_word(word):
-                word_score = self.calculate_word_score(word)
-                total_score += word_score
-                
-        return total_score
-    
-    def _identify_words_formed(self, placed_tiles):
-        """
-        Identify all words formed by the placed tiles.
-        Returns a list of words (as strings).
-        """
-        # This is a placeholder - you'll need to implement this based on your board representation
-        # For each placed tile, extend left/right and up/down to find complete words
-        words = []
-        
-        # Implementation would depend on your specific board representation
-        # and how you track words
-        
-        return words
-    
-    def _is_valid_move(self, candidate):
-        """
-        Check if a candidate move is valid according to Scrabble rules.
-        """
-        # A move is valid if:
-        # 1. All formed words are valid
-        # 2. All placed tiles are in a single row or column
-        # 3. All placed tiles are connected to existing tiles (except first move)
-        # 4. No tiles overlap with existing tiles
-        
-        # For simplicity, let's assume we're checking word validity in _calculate_placement_score
-        # and we're handling overlap prevention in _generate_next_moves
-        
-        placed_positions = [pos for pos, _ in candidate['placed_tiles']]
-        
-        # Check if tiles are placed in a straight line
-        if not self._is_straight_line(placed_positions):
-            return False
-            
-        # Other validity checks would go here
-        
-        return True
-    
-    def _is_straight_line(self, positions):
-        """Check if all positions are in a straight line (same row or same column)."""
-        if not positions:
-            return True
-            
-        rows = [pos[0] for pos in positions]
-        cols = [pos[1] for pos in positions]
-        
-        return len(set(rows)) == 1 or len(set(cols)) == 1
+
