@@ -56,14 +56,14 @@ class ScrabbleAI(Player):
         legal_moves = find_all_moves(self.board, self.rack)
         
         if not legal_moves:
-            return None, "skip"
+            return None, ""
         
         # Use the strategy to find the best move
         # USE a "find_best_move" function WITHIN EACH STRAT
         best_move = self.get_best_move(self.board, self.rack, legal_moves)
         
         if not best_move:
-            return None, "skip"
+            return None, ""
         
         return best_move, "play"
     
@@ -111,6 +111,12 @@ class ScrabbleAI(Player):
         return
     
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
+    
+def get_beam_move(dictionary, board, rack, legal_moves):
+    if not dictionary or not rack or not legal_moves or not board:
+        return None, ""
+    
+    
     
 def find_anchor_points(board):
 
@@ -501,7 +507,7 @@ def record_move(word, placed_tiles, direction, valid_moves):
     
     valid_moves.append(move)
 
-def calculate_placement_score(self, placed_tiles):
+def calculate_placement_score(placed_tiles, board, direction, ):
     """
     Calculate the score for a set of placed tiles.
     
@@ -522,7 +528,7 @@ def calculate_placement_score(self, placed_tiles):
     # First pass: calculate the main word score and any cross-word scores
     for position, letter in placed_tiles:
         row, col = position
-        node = self.board.get_node(row, col)
+        node = board.get_node(row, col)
         
         if not node:
             continue
@@ -548,7 +554,7 @@ def calculate_placement_score(self, placed_tiles):
             main_word_tiles.append((position, letter))
             
             # Check for cross-words formed
-            cross_word_score = self.calculate_cross_word_score(row, col, letter, self.direction)
+            cross_word_score = calculate_cross_word_score(row, col, letter, direction)
             total_score += cross_word_score
         else:
             # This is an existing tile we're using
@@ -657,7 +663,7 @@ def calculate_cross_word_score(board, row, col, letter, direction):
         # Build the word from left to right
         start_col = curr_col
         while True:
-            curr_node = self.board.get_node(row, curr_col)
+            curr_node = board.get_node(row, curr_col)
             if not curr_node:
                 break
             
@@ -691,6 +697,8 @@ def calculate_cross_word_score(board, row, col, letter, direction):
     if len(word) >= 2:
         return word_score * word_multiplier
     return 0
+
+
 
 class MCTS:
     def __init__(self, state, parent=None, move=None):
