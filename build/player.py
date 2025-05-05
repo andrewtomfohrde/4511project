@@ -57,7 +57,14 @@ class Tile:
     def get_letter(self):
         #Returns the tile's actual letter
         return self.letter
-        
+    
+    def copy(self):
+        """
+        Creates a deep copy of the rack for move simulation without modifying the original.
+        Returns a new Rack instance with the same tiles.
+        """
+        return Tile(self.letter, LETTER_VALUES)
+    
 class Bag:
     """
     Creates the bag of all tiles that will be available during the game. Contains 98 letters and two blank tiles.
@@ -152,6 +159,35 @@ class Rack:
         #Adds tiles to the rack after a turn such that the rack will have 7 tiles (assuming a proper number of tiles in the bag).
         while self.get_rack_length() < 7 and self.bag.get_remaining_tiles() > 0:
             self.add_to_rack()
+    
+    def get_tile(self, letter):
+        for tile in self.rack:
+            if (letter == tile.get_letter()):
+                return tile
+
+    def copy(self):
+        """
+        Creates a deep copy of the rack for move simulation without modifying the original.
+        Returns a new Rack instance with the same tiles.
+        """
+        new_rack = Rack(self.bag)
+        # Clear the automatically initialized tiles
+        new_rack.rack = []
+        
+        # Create copies of each tile in the rack
+        for tile in self.rack:
+            # If your Tile class has a copy method, use that
+            # new_rack.rack.append(tile.copy())
+            
+            # If not, you might need to create a new Tile with same attributes
+            # Assuming Tile has a constructor that takes a letter and points
+            # new_rack.rack.append(Tile(tile.get_letter(), tile.get_points()))
+            
+            # For a simple approach, just add the original tile (shallow copy)
+            # This works if you're only removing tiles, not modifying them
+            new_rack.rack.append(tile.copy())
+            
+        return new_rack
             
 class Player:
     """

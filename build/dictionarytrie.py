@@ -32,7 +32,8 @@ class DictionaryTrie:
                 current.children[letter] = self.Node()
             current = current.children[letter]
         current.is_terminal = True
-        return
+        current.word = word.upper()
+        return current
     
     def is_word(self, word):
         """Check if a word is in the dictionary."""

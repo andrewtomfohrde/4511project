@@ -4,6 +4,7 @@ from word import Word
 import math
 import random
 import copy
+from collections import deque
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
@@ -39,6 +40,7 @@ class ScrabbleAI(Player):
         super().__init__(bag)  # Initialize the Player attributes
         self.dict = dictionary
         self.board = board
+        self.set_strat(strategy)
 
     def set_strat(self, strat_name):
         if strat_name in ["BEAM", "ASTAR", "GBFS", "BFS"]:
@@ -55,17 +57,17 @@ class ScrabbleAI(Player):
     def make_move(self):
         """Make the best move according to the current strategy"""
         # Find all legal moves
-        legal_moves = find_all_moves(self.board, self.rack)
+        legal_moves = find_all_moves(self.board, self.rack, self.dict)
         
         if not legal_moves:
-            return None, "skip"
+            return None, "sk1p"
         
         # Use the strategy to find the best move
         # USE a "find_best_move" function WITHIN EACH STRAT
-        best_move = self.get_best_move(self.board, self.rack, legal_moves)
+        best_move = self.get_best_move()
         
         if not best_move:
-            return None, "skip"
+            return None, "sk1p"
         
         return best_move, "play"
     
@@ -78,19 +80,22 @@ class ScrabbleAI(Player):
         """
         if self.name == "AI_GBFS":
             # Greedy best first search strategy
-            return self.get_gbfs_move()
+            return get_gbfs_move()
         elif self.name == "AI_ASTAR":
             # A* strategy
-            return self.get_astar_move()
+            return get_astar_move()
         elif self.name == "AI_BEAM":
             # Beam strategy
-            return self.get_beam_move()
+            return get_beam_move(self.board, self.rack)
         elif self.name == "AI_BFS":
             # BFS strategy
-            return self.get_bfs_move()
+            return get_bfs_move(self.board, self.rack, self.dict)
+        elif self.name == "AI_DFS":
+            # dFS strategy
+            return get_dfs_move(self.board, self.rack, self.dict)
         else:
             # Default to Monte Carlo Tree Search strategy
-            return self.get_mcts_move()
+            return get_mcts_move()
     
     def get_gbfs_move(self):
         """TO BE IMPLEMENTED"""
@@ -100,35 +105,76 @@ class ScrabbleAI(Player):
         """TO BE IMPLEMENTED"""
         return
     
-    def get_beam_move(self):
-        """TO BE IMPLEMENTED"""
-        return
-    
-    def get_bfs_move(self):
-        """TO BE IMPLEMENTED"""
-        return
-    
+
     def get_mcts_move(self):
         """TO BE IMPLEMENTED"""
         return
     
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
     
-def get_beam_move(dictionary, board, rack, legal_moves):
+def get_bfs_move(board, rack, dict):
+    valid_moves = find_all_moves(board, rack, dict)
+    move_tree = create_word_tree(valid_moves, rack)
 
-    if not dictionary or not rack or not legal_moves or not board:
+    queue = deque()
+    queue.append((move_tree.root, ""))
+
+    while not queue:
+        node, path = queue.popleft()
+
+        if node.is_terminal and node.word:
+            best_move = {
+                'word': node.word,
+                'position': node.position,
+                'direction': node.direction,
+            }
+            return best_move
+        
+        for letter, child in node.children.items():
+            queue.append((child, path + letter))
+
+    return best_move
+
+def get_dfs_move(board, rack):
+    valid_moves = find_all_moves(board, rack, dict)
+    move_tree = create_word_tree(valid_moves, rack)
+
+    curr = move_tree.root
+    return dfs_search(curr)
+
+def dfs_search(node):
+    children = node.keys()
+    if children:
+        let = children[0]
+        next = node.get_child(let)
+        # If we're at a deeper level or same level but higher score
+        dfs_search(next)
+    else:
+        best_move = {
+            'word': node.word,
+            'position': node.position,
+            'direction': node.direction
+        }
+        # Continue DFS on all children
+    return best_move
+
+def get_beam_move(board, rack):
+
+    if not rack or not board:
         return None, ""
+    
     valid_moves = find_all_moves(board, rack)
     move_tree = create_word_tree(valid_moves, rack)
+
     best_move = beam_search(move_tree, 10)
+    return best_move
 
     
 def create_word_tree(moves, rack):
     move_tree = DictionaryTrie()
-    tile_score = 0
     for word, pos, dir, placed, score in moves:
-        check = move_tree.get_node(word)
-        new_score = score - rack_score(placed, rack)
+        check = move_tree.get_node(moves["word"])
+        new_score = score - rack_score(moves['placed_tiles'], rack)
         if check and check.score < new_score:
             check.set_attr(word, pos, dir, new_score)
         else:
@@ -141,13 +187,19 @@ def rack_score(placed, rack):
     score = 0
     con = 0
     vow = 0
-    rack_arr = []
-    for tile in rack:
-        rack_arr.append(tile.get_char())
+    new_rack = []
+    rack_arr = rack.get_rack_arr()
+    i = 0
+    for tile in rack_arr:
+        el = tile.get_letter()
+        new_rack.append(el)
+        i = i + 1
         
+    print(placed)
+
     for location, letter in placed:
-        if letter in rack_arr:
-            rack_arr.remove(letter)
+        if letter in new_rack:
+            new_rack.remove(letter)
             if letter == "#":
                 score += 1
             elif letter in ['A', 'E', 'I', 'O', 'U']:
@@ -167,7 +219,7 @@ def rack_score(placed, rack):
     
     return score
 
-def beam_search(move_tree, beam_width=10, beam_depth):
+def beam_search(move_tree, beam_width=10):
     """
     Perform beam search on the word tree to find the best move.
     
@@ -205,7 +257,6 @@ def beam_search(move_tree, beam_width=10, beam_depth):
             if node.word and node.score:
                 # Check if this is the best move found so far
                 if node.score > best_score:
-                    best_score = node.score
                     best_move = {
                         'word': node.word,
                         'position': node.position,
@@ -388,7 +439,7 @@ def get_cross_checks(board, dict, row, col, direction):
         
         return valid_cross_letters
 
-def find_all_moves(board, rack):
+def find_all_moves(board, rack, dict):
     """
     Find all valid moves for the current board and rack.
     
@@ -396,22 +447,22 @@ def find_all_moves(board, rack):
         List of valid moves with scores
     """
     valid_moves = []
-    anchor_points = board.find_anchor_points()
+    anchor_points = find_anchor_points(board)
     
     # Find moves for each anchor point in both directions
     for row, col in anchor_points:
         # Try horizontal placement
-        right_moves = find_moves_at_anchor(row, col, rack, "right")
+        right_moves = find_moves_at_anchor(dict, board, row, col, rack, "right")
         
         # Try vertical placement
-        down_moves = find_moves_at_anchor(row, col, rack, "down")
+        down_moves = find_moves_at_anchor(dict, board, row, col, rack, "down")
     
     valid_moves = right_moves + down_moves
     
     # Sort moves by score (highest first)
     return valid_moves
 
-def find_moves_at_anchor(board, anchor_row, anchor_col, rack, direction):
+def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
     """
     Find all valid moves that go through a specific anchor point in a given direction.
     
@@ -433,7 +484,7 @@ def find_moves_at_anchor(board, anchor_row, anchor_col, rack, direction):
             start_row, start_col = anchor_row - prefix_length, anchor_col
         
         # Find all words that can be placed starting at this position
-        generate_moves(start_row, start_col, rack, direction, prefix_length, board, valid_moves) ############### what to set this to?
+        generate_moves(dict, start_row, start_col, rack, direction, prefix_length, board, valid_moves) ############### what to set this to?
     
     return valid_moves
 
@@ -484,23 +535,34 @@ def generate_moves(dict, start_row, start_col, rack, direction, prefix_length, b
         prefix_length: How far into the word is the anchor point
     """
     # Start with the root of the dictionary trie
-    generate_moves_recursive("", dict.root, start_row, start_col, board, 
-                                    rack, direction, prefix_length, [], False, valid_moves)
+    rack_arr = rack.get_rack_arr()
+    new_rack = []
+    i = 0
+    for tile in rack_arr:
+        el = tile.get_letter()
+        new_rack.append(el)
+        i = i + 1
 
-def generate_moves_recursive(partial_word, dict_node, row, col, available_rack, board, 
-                            direction, remaining_prefix, placed_tiles, word_has_anchor, valid_moves):
+    generate_moves_recursive("", dict, dict.root, start_row, start_col, board, 
+                                    new_rack, direction, prefix_length, [], False, valid_moves)
+
+def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, available_rack,
+                          direction, remaining_prefix, placed_tiles, word_has_anchor, valid_moves):
     """
     Recursively generate all valid moves starting from a position.
     
     Args:
         partial_word: Word built so far
+        dict: The dictionary trie
         dict_node: Current node in the dictionary trie
         row, col: Current position on the board
+        board: Game board
         available_rack: Letters still available in the rack
         direction: 'right' or 'down'
         remaining_prefix: How many more letters before reaching the anchor
         placed_tiles: List of tiles placed so far [(position, letter)]
         word_has_anchor: Whether the word uses an existing anchor point
+        valid_moves: List to store valid moves
     """
     # Check if we're still on the board
     node = board.get_node(row, col)
@@ -508,13 +570,13 @@ def generate_moves_recursive(partial_word, dict_node, row, col, available_rack, 
         # We've gone off the board, so check if we have a valid word
         if dict_node.is_terminal and word_has_anchor and partial_word:
             # We have a complete word that uses an anchor
-            record_move(partial_word, placed_tiles, direction, valid_moves)
+            record_move(partial_word, placed_tiles, direction, valid_moves, board)
         return
     
     # If this square is already occupied, we must use that letter
     if node.tile:
         # Get the letter on this square
-        letter = node.tile.char
+        letter = node.tile.get_letter()
         
         # Check if this letter continues a valid path in our dictionary
         next_node = dict_node.get_child(letter)
@@ -527,82 +589,96 @@ def generate_moves_recursive(partial_word, dict_node, row, col, available_rack, 
             # Continue recursively
             generate_moves_recursive(
                 partial_word + letter,
+                dict,
                 next_node,
                 next_row,
                 next_col,
-                available_rack,
                 board,
+                available_rack,
                 direction,
                 0,  # No more prefix needed since we've already placed at least one tile
-                placed_tiles + [((row, col), None)],  # Mark that we used an existing tile
+                placed_tiles + [((row, col), letter)],  # Mark that we used an existing tile
                 True,  # We've now used at least one anchor
                 valid_moves
             )
     else:
         # The square is empty, we can place any letter from our rack
         
+        # Get the tiles from the rack
+        rack_tiles = available_rack
+        
         # If we need to place a prefix tile, we don't check cross-constraints yet
         if remaining_prefix > 0:
-            valid_letters = set(available_rack)
+            valid_tiles = rack_tiles  # Use all tiles in the rack for prefix
         else:
             # Get the set of valid letters based on cross-checks
-            valid_letters = get_cross_checks(board, row, col, direction).intersection(available_rack)
+            valid_letters = get_cross_checks(board, dict, row, col, direction)
+            # Filter rack tiles to only those that match valid letters
+            valid_tiles = [tile for tile in rack_tiles if tile in valid_letters]
         
-        # Try each valid letter
-        for tile in valid_letters:
-            letter = tile.get_letter()
-            # Check if this letter continues a valid path in our dictionary
-            next_node = dict_node.get_child(letter)
-            if next_node:
-                # This letter is valid, so continue building the word
-                
-                # Remove the letter from the rack
+        # Try each valid tile
+        for tile in valid_tiles:
+            
+            # Check if this is a blank tile (represented by "#")
+            if tile == "#":
+                # Handle blank tile - can represent any letter
                 rack_copy = available_rack.copy()
-                rack_copy.remove(letter)
+                rack_copy.remove(tile)
                 
-                # Calculate next position
-                next_row, next_col = get_next_position(row, col, direction)
-                
-                # Continue recursively
-                generate_moves_recursive(
-                    partial_word + letter,
-                    next_node,
-                    next_row,
-                    next_col,
-                    rack_copy,
-                    board,
-                    direction,
-                    max(0, remaining_prefix - 1),
-                    placed_tiles + [((row, col), letter)],
-                    word_has_anchor or remaining_prefix == 0, # A tile at the anchor counts
-                    valid_moves
-                )
-            elif letter == "#":
-                rack_copy = available_rack.copy()
-                rack_copy.remove(letter)
-                
-                # Calculate next position
-                next_row, next_col = get_next_position(row, col, direction)
-                
-                for char in dict_node.children:
+                # Try each possible letter from the dictionary
+                for char in dict_node.children.keys():
+                    next_node = dict_node.get_child(char)
+                    if next_node:
+                        # Calculate next position
+                        next_row, next_col = get_next_position(row, col, direction)
+                        
+                        # Continue recursively with this letter
+                        generate_moves_recursive(
+                            partial_word + char,
+                            dict,
+                            next_node,
+                            next_row,
+                            next_col,
+                            board,
+                            rack_copy,
+                            direction,
+                            max(0, remaining_prefix - 1),
+                            placed_tiles + [((row, col), char)],
+                            word_has_anchor or remaining_prefix == 0,  # A tile at the anchor counts
+                            valid_moves
+                        )
+            else:
+                # Regular tile
+                next_node = dict_node.get_child(tile)
+                if next_node:
+                    # This letter is valid, so continue building the word
+                    
+                    # Make a copy of the rack and remove the used tile
+                    rack_copy = available_rack.copy()
+                    rack_copy.remove(tile)
+                    
+                    # Calculate next position
+                    next_row, next_col = get_next_position(row, col, direction)
+                    
                     # Continue recursively
                     generate_moves_recursive(
-                        partial_word + char,
+                        partial_word + tile,
+                        dict,
                         next_node,
                         next_row,
                         next_col,
-                        rack_copy,
                         board,
+                        rack_copy,
                         direction,
                         max(0, remaining_prefix - 1),
-                        placed_tiles + [((row, col), char)],
+                        placed_tiles + [((row, col), tile)],
                         word_has_anchor or remaining_prefix == 0,  # A tile at the anchor counts
                         valid_moves
-                )
+                    )
         
         # If we have a valid word so far and we've used an anchor, record it
         if dict_node.is_terminal and word_has_anchor and partial_word:
-            ### ADD TO List of valid moves
+            # Add to list of valid moves
             record_move(partial_word, placed_tiles, direction, valid_moves, board)
 
 def get_next_position(row, col, direction):
@@ -688,7 +764,7 @@ def calculate_placement_score(placed_tiles, board, direction):
             main_word_tiles.append((position, letter))
             
             # Check for cross-words formed
-            cross_word_score = calculate_cross_word_score(row, col, letter, direction)
+            cross_word_score = calculate_cross_word_score(board, row, col, letter, direction)
             total_score += cross_word_score
         else:
             # This is an existing tile we're using
@@ -729,8 +805,7 @@ def calculate_cross_word_score(board, row, col, letter, direction):
         if not (board.get_node(row-1, col) and board.get_node(row-1, col).tile) and \
             not (board.get_node(row+1, col) and board.get_node(row+1, col).tile):
             return 0  # No cross-word formed
-    else:  # cross_direction == 'right'
-        # Check for tiles to the left or right
+    else:
         if not (board.get_node(row, col-1) and board.get_node(row, col-1).tile) and \
             not (board.get_node(row, col+1) and board.get_node(row, col+1).tile):
             return 0  # No cross-word formed
@@ -775,7 +850,7 @@ def calculate_cross_word_score(board, row, col, letter, direction):
                 elif curr_node.score_multiplier == "DWS":
                     word_multiplier *= 2
             elif curr_node.tile:
-                curr_letter = curr_node.tile
+                curr_letter = curr_node.tile.get_letter()
                 letter_score = LETTER_VALUES[curr_letter]
             else:
                 break
@@ -818,7 +893,7 @@ def calculate_cross_word_score(board, row, col, letter, direction):
                 elif curr_node.score_multiplier == "DWS":
                     word_multiplier *= 2
             elif curr_node.tile:
-                curr_letter = curr_node.tile
+                curr_letter = curr_node.tile.get_letter()
                 letter_score = LETTER_VALUES[curr_letter]
             else:
                 break

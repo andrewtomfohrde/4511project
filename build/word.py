@@ -135,10 +135,10 @@ class Word:
                 if (col - i == 0) or (not curr_tile.left.tile):
                     break
             i = 0
-            while ((curr_tile.right.tile) or (curr_tile.position == (row, col + i))) and (col + i <= 14):
+            while ((curr_tile.right and curr_tile.right.tile) or (curr_tile.position == (row, col + i))) and (col + i <= 14):
                 if curr_tile.position == (row, col + i) and len(self.word) > i:
                     full += self.word[i]
-                elif (curr_tile.right.tile):
+                elif (curr_tile.right and curr_tile.right.tile):
                     full += curr_tile.tile.letter
                     i = 0
                 else:
@@ -159,7 +159,7 @@ class Word:
             while ((curr_tile.down and curr_tile.down.tile) or (curr_tile.position == (row + i, col))) and (row + i <= 14):
                 if curr_tile.position == (row + i, col) and len(self.word) > i:
                     full += self.word[i]
-                elif (curr_tile.down.tile):
+                elif (curr_tile.down and curr_tile.down.tile):
                     full += curr_tile.tile.get_letter()
                     i = 0
                 else:
@@ -262,13 +262,13 @@ class Word:
                 # Look upward
                 r = row - 1
                 while r >= 0 and self.board.get_node(r, col).tile:
-                    word = self.board.get_node(r, col).tile.letter + word
+                    word = self.board.get_node(r, col).tile.get_letter() + word
                     r -= 1
 
                 # Look downward
                 r = row + 1
                 while r < 15 and self.board.get_node(r, col).tile:
-                    word += self.board.get_node(r, col).tile.letter
+                    word += self.board.get_node(r, col).tile.get_letter()
                     r += 1
 
             # If the main word is vertical, look horizontally
@@ -276,13 +276,13 @@ class Word:
                 # Look left
                 c = col - 1
                 while c >= 0 and self.board.get_node(row, c).tile:
-                    word = self.board.get_node(row, c).tile.letter + word
+                    word = self.board.get_node(row, c).tile.get_letter() + word
                     c -= 1
 
                 # Look right
                 c = col + 1
                 while c < 15 and self.board.get_node(row, c).tile:
-                    word += self.board.get_node(row, c).tile.letter
+                    word += self.board.get_node(row, c).tile.get_letter()
                     c += 1
 
             # Only add if an actual secondary word was formed
@@ -335,7 +335,7 @@ class Word:
                         curr_node = curr_node.up
                     while curr_node.tile:
                         tile = curr_node.tile
-                        letter_score = LETTER_VALUES[tile]
+                        letter_score = LETTER_VALUES[tile.get_letter()]
                         if curr_node.position == (row, col):
                             letter_score = letter_score * xls
                             sec_val = letter_score
@@ -352,7 +352,7 @@ class Word:
                         curr_node = curr_node.left
                     while curr_node.tile:
                         tile = curr_node.tile
-                        letter_score = LETTER_VALUES[tile]
+                        letter_score = LETTER_VALUES[tile.get_letter()]
                         if curr_node.position == (row, col):
                             sec_val = letter_score * xls
                             letter_score = letter_score * xls
@@ -367,7 +367,7 @@ class Word:
                 tiles_used += 1
             else:
                 tile = curr_node.tile
-                letter_score = LETTER_VALUES[tile]
+                letter_score = LETTER_VALUES[tile.get_letter()]
                 curr_score += letter_score
         total_score += (curr_score * fxws)
         

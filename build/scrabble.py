@@ -2,7 +2,7 @@ from random import shuffle
 import re
 from dictionarytrie import DictionaryTrie
 from word import Word, load_dictionary_from_file
-from algos import ScrabbleAI, MCTS, BeamSearchScrabble
+from algos import ScrabbleAI, MCTS
 from player import Tile, Bag, Rack, Player
 
 # from mcts_scrabble import monte_carlo_tree_search
@@ -64,12 +64,12 @@ class ScrabbleBoard:
             
         def place_blank(self, tile, char):
             self.tile = tile
-            self.char = tile.letter
+            self.tile.char = char
             
         def get_display_str(self):
             """Return a string representation of this cell."""
             if self.tile:
-                return f"{self.char}/{self.tile}"
+                return f"{self.tile.char}/{self.tile.letter}"
             elif self.position == (7, 7):  # Center square
                 return " * "
             elif self.score_multiplier:
@@ -200,17 +200,17 @@ class ScrabbleBoard:
                 print("Tile already placed in previous move\n")
                 
             else:
-                for tile in player.rack.rack:
+                for tile in player.rack.get_rack_arr():
                     # For blank tiles, look for '#'
                     if is_blank and tile.get_letter() == '#':
                         used_tile = tile
-                        node.place_blank(used_tile.get_letter(), placed_tiles[i][1])
+                        node.place_blank(used_tile, placed_tiles[i][1])
                         print(f"Placing tile # as {placed_tiles[i][1]}")
                         break
                     # For regular tiles, look for matching letter
                     elif not is_blank and tile.get_letter() == letter:
                         used_tile = tile
-                        node.place_tile(used_tile.get_letter())
+                        node.place_tile(used_tile)
                         print(f"Placing tile {used_tile.get_letter()}")
                         break
                 
@@ -290,9 +290,9 @@ class Game:
                 print(f"[{player.get_name()} is thinking...]")
                 
                 # Get AI's move
-                best_move, action = player.make_move(board)
+                best_move, action = player.make_move()
                 
-                if action == "skip" and not best_move:
+                if action == "sk1p" and not best_move:
                     print(f"{player.get_name()} has no valid moves. Skipping turn.")
                     self.skipped_turns += 1
                 else:
@@ -411,7 +411,7 @@ class Game:
         self.add_player(human)
         
         # Create AI player
-        ai_strategy = input("Select AI strategy (MCTS/BEAM/ASTAR/GBFS/BFS): ").upper()
+        ai_strategy = input("Select AI strategy (MCTS/BEAM/ASTAR/GBFS/BFS/DFS): ").upper()
         ai = ScrabbleAI(self.dictionary, board, bag, ai_strategy)
         self.add_player(ai)
         
@@ -426,7 +426,7 @@ class Game:
         # Create AI players
         num_ais = int(input("Enter number of AI players (2-4): "))
         for i in range(min(num_ais, 4)):
-            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/AStar/GBFS): ").upper()
+            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/AStar/GBFS/BFS/DFS): ").upper()
             ai = ScrabbleAI(self.dictionary, bag, ai_strategy)
             self.add_player(ai)
         
@@ -440,9 +440,9 @@ class Game:
         # Deduct points for remaining tiles in rack
         for player in self.players:
             deduction = 0
-            for tile in player.rack.rack:
+            for tile in player.rack.get_rack_array():
                 if tile in LETTER_VALUES:
-                    deduction += LETTER_VALUES[tile]
+                    deduction += LETTER_VALUES[tile.get_letter()]
             player.increase_score(-deduction)
             if deduction > 0:
                 print(f"{player.get_name()} loses {deduction} points for unplayed tiles.")
