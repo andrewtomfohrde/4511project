@@ -44,6 +44,75 @@ class Word:
         self.board = board
         self.blank_positions = [] # do we need
     
+    def validate_move_connectivity(self):
+        """
+        Validates that a move properly connects to existing tiles on the board.
+        
+        Args:
+            board: Game board
+            word: The word being played
+            position: Starting position (col, row)
+            direction: "right" or "down"
+            placed_tiles: List of tiles placed [(position, letter)]
+            
+        Returns:
+            True if the move connects to existing tiles, False otherwise
+        """
+        # Skip connectivity check for first word (should be checked separately)
+        first_word = True
+        for row in range(15):
+            for col in range(15):
+                node = self.board.get_node(row, col)
+                if node and node.tile:
+                    first_word = False
+                    break
+            if not first_word:
+                break
+                
+        if first_word:
+            # For first word, check if it covers center star (7,7)
+            row, col = self.location
+            if self.direction == "right":
+                return col <= 7 <= col + len(self.word) - 1 and row == 7
+            else:  # down
+                return row <= 7 <= row + len(self.word) - 1 and col == 7
+                
+        # For subsequent words, check connectivity
+        connects_to_existing = False
+        all_positions = []
+        
+        # Get all positions this word will occupy
+        row, col = self.location
+        if self.direction == "right":
+            all_positions = [(row, col + i) for i in range(len(self.word))]
+        else:  # down
+            all_positions = [(row + i, col) for i in range(len(self.word))]
+        
+        # Check if any position in the word overlaps with existing tiles
+        for pos in all_positions:
+            r, c = pos
+            node = self.board.get_node(r, c)
+            if node and node.tile:
+                connects_to_existing = True
+                break
+        
+        # Check if any adjacent position has a tile
+        if not connects_to_existing:
+            for pos in all_positions:
+                r, c = pos
+                # Check adjacent cells (up, down, left, right)
+                adjacent_positions = [(r-1, c), (r+1, c), (r, c-1), (r, c+1)]
+                for adj_row, adj_col in adjacent_positions:
+                    if 0 <= adj_row < 15 and 0 <= adj_col < 15:
+                        node = self.board.get_node(adj_row, adj_col)
+                        if node and node.tile:
+                            connects_to_existing = True
+                            break
+                if connects_to_existing:
+                    break
+                    
+        return connects_to_existing
+    
     def check_word(self):
         """
         Enhanced check_word method that validates the primary word and all
@@ -66,64 +135,11 @@ class Word:
         full = "" # full in-line word; checking validity of placement
         
         # Check if this is the first word
-        first_word = True
+        connects = self.validate_move_connectivity()    
         
-        # Check each position on the board instead of iterating through board rows
-        for row in range(15):
-            for col in range(15):
-                node = self.board.get_node(row, col)
-                if node.tile:
-                    first_word = False
-                    break
-            if not first_word:
-                break
-        
-        # First word must be placed on the center star
-        if first_word:
-            if not ((self.direction == "right" and self.location[0] == 7 and 
-                    self.location[1] <= 7 <= self.location[1] + len(self.word) - 1) or
-                    (self.direction == "down" and self.location[1] == 7 and 
-                    self.location[0] <= 7 <= self.location[0] + len(self.word) - 1)):
-                print("First word must cover the center star.")
-                return False, None
-        
-        # For subsequent words, check if the placement touches existing tiles
-        else:
-            connects_to_existing = False
-            all_positions = []
-            
-            # Get all positions this word will occupy
-            if self.direction == "right":
-                all_positions = [(self.location[0], self.location[1] + i) for i in range(len(self.word))]
-            else:  # down
-                all_positions = [(self.location[0] + i, self.location[1]) for i in range(len(self.word))]
-            
-            # Check if any position in the word overlaps with existing tiles
-            for pos in all_positions:
-                row, col = pos
-                node = self.board.get_node(row, col)
-                if node.tile:
-                    connects_to_existing = True
-                    break
-            
-            # Check if any adjacent position has a tile
-            if not connects_to_existing:
-                for pos in all_positions:
-                    row, col = pos
-                    # Check adjacent cells (up, down, left, right)
-                    adjacent_positions = [(row-1, col), (row+1, col), (row, col-1), (row, col+1)]
-                    for adj_row, adj_col in adjacent_positions:
-                        if 0 <= adj_row < 15 and 0 <= adj_col < 15:
-                            node = self.board.get_node(adj_row, adj_col)
-                            if node.tile:
-                                connects_to_existing = True
-                                break
-                    if connects_to_existing:
-                        break
-            
-            if not connects_to_existing:
-                print("Word must connect to existing tiles on the board.")
-                return False, None
+        if not connects:
+            print("Word must connect to existing tiles on the board.")
+            return False, None
                 
         if self.direction == "right":
             row, col = self.location
@@ -181,7 +197,6 @@ class Word:
         
         # Check if player has required tiles for the main word
         required_letters = list(self.word)
-        board_letters = []
         place_tiles = []
         
         # Identify which letters will come from the board
@@ -193,7 +208,6 @@ class Word:
                         print(f"Invalid move, played {self.word[i]} instead of {node.tile.letter}. Try again!")
                         return False, None
                     else:
-                        board_letters.append(node.tile.letter())
                         required_letters[i] = None  # Mark as provided by board
                         place_tiles.append(((self.location[0], self.location[1] + i), None))
                 else:
@@ -206,7 +220,6 @@ class Word:
                         print(f"Invalid move, played {self.word[i]} instead of {node.tile.letter}. Try again!")
                         return False, None
                     else:
-                        board_letters.append(node.tile.letter)
                         required_letters[i] = None  # Mark as provided by board
                         place_tiles.append(((self.location[0] + i, self.location[1]), None))
                 else:

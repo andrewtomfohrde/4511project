@@ -296,9 +296,9 @@ class Game:
                     print(f"{player.get_name()} has no valid moves. Skipping turn.")
                     self.skipped_turns += 1
                 else:
-                    word_to_play = best_move['word']
-                    location = best_move['position']
-                    direction = best_move['direction']
+                    word_to_play = best_move[0]
+                    location = best_move[1]
+                    direction = best_move[2]
                     
                     print(f"{player.get_name()} plays: {word_to_play} at {location} going {direction}")
                     
@@ -315,6 +315,8 @@ class Game:
                     else:
                         print(f"{player.get_name()} attempted invalid word. Skipping.")
                         self.skipped_turns += 1
+                print(f"\n{player.get_name()}'s Letter Rack: {player.get_rack_str()}")
+
             
             # Human player's turn
             else:
