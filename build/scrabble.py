@@ -429,7 +429,7 @@ class Game:
         num_ais = int(input("Enter number of AI players (2-4): "))
         for i in range(min(num_ais, 4)):
             ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/AStar/GBFS/BFS/DFS): ").upper()
-            ai = ScrabbleAI(self.dictionary, bag, ai_strategy)
+            ai = ScrabbleAI(self.dictionary, board, bag, ai_strategy)
             self.add_player(ai)
         
         # Start the game with the first AI
@@ -442,7 +442,7 @@ class Game:
         # Deduct points for remaining tiles in rack
         for player in self.players:
             deduction = 0
-            for tile in player.rack.get_rack_array():
+            for tile in player.rack.get_rack_arr():
                 if tile in LETTER_VALUES:
                     deduction += LETTER_VALUES[tile.get_letter()]
             player.increase_score(-deduction)

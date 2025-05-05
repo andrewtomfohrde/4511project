@@ -1,4 +1,5 @@
 from dictionarytrie import DictionaryTrie
+from word import DictionaryTrie
 
 
 
