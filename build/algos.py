@@ -696,7 +696,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                             direction,
                             max(0, remaining_prefix - 1),
                             new_placed_tiles,
-                            word_has_anchor,  # A tile at the anchor counts
+                            word_has_anchor or remaining_prefix==-1,  # A tile at the anchor counts
                             valid_moves
                         )
                 print("blank recursion is done#################")
@@ -727,7 +727,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                         direction,
                         max(0, remaining_prefix - 1),
                         new_placed_tiles,
-                        word_has_anchor,  # A tile at the anchor counts
+                        word_has_anchor or remaining_prefix==-1,  # A tile at the anchor counts
                         valid_moves
                     )
             # print(f"Curr word is {partial_word}")

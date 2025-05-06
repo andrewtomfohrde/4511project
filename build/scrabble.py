@@ -222,6 +222,7 @@ class ScrabbleBoard:
                                 used_tile = tile
                                 is_blank = True
                                 print(f"Using {used_tile.get_letter()} to fill in gaps of your play.")
+                                node.place_blank(used_tile, letter)
                                 break
             
             if used_tile:
