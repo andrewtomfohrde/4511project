@@ -119,7 +119,6 @@ def get_dfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
     move_tree = create_word_tree(valid_moves, rack)
 
-    print(move_tree)
     return dfs_search(move_tree.root)
 
 def dfs_search(node):
@@ -137,13 +136,19 @@ def dfs_search(node):
         # If child_result is not None, it's a list [word, position, direction]
         # The score is stored in the node
         if child_result and hasattr(child_node, 'score'):
-            print(f"{child_node.word} set at {child_node.position} wit score {child_node.score}!")
             child_score = child_node.score
             if child_score > best_score:
                 best_score = child_score
                 best_move = child_result
     
     return best_move
+
+
+def get_astar_move(board, rack, dict):
+    valid_moves = find_all_moves(board, rack, dict)
+    move_tree = create_word_tree(valid_moves, rack)
+
+
 
 def get_beam_move(board, rack):
 
@@ -323,9 +328,7 @@ def find_anchor_points(board):
     if not anchor_points:
         center = board.get_node(7,7)
         anchor_points.add(center.position)
-        return list(anchor_points)
     
-    print(list(anchor_points))
     return list(anchor_points)
     
 
@@ -336,13 +339,17 @@ def get_cross_checks(board, dict, row, col, direction):
     cross-checks (words formed in the perpendicular direction).
     
     Args:
+        board: The game board
+        dict: Dictionary of valid words
         row, col: Position to check
-        direction: 'across' or 'down'
+        direction: 'right' for horizontal words, 'down' for vertical words
     
     Returns:
         Set of valid letters that can be placed at this position
     """
-    valid_letters = set(LETTER_VALUES)  # Start with all letters
+    # Start with all possible letters (assuming LETTER_VALUES is defined elsewhere)
+    # Replace this with the appropriate set of letters for your game
+    valid_letters = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ")  
     
     node = board.get_node(row, col)
     if not node:
@@ -350,7 +357,7 @@ def get_cross_checks(board, dict, row, col, direction):
         
     if node.tile:
         # If the square is already occupied, only the existing letter is valid
-        return {node.tile}
+        return {node.tile.get_letter()}
     
     # If this is an empty square, check what cross-words would be formed
     if direction == "right":
@@ -395,7 +402,7 @@ def get_cross_checks(board, dict, row, col, direction):
                     # This is our test position
                     word += letter
                 elif curr_node.tile:
-                    word += curr_node.tile.letter
+                    word += curr_node.tile.get_letter()
                 else:
                     break
                 
@@ -450,7 +457,7 @@ def get_cross_checks(board, dict, row, col, direction):
                     # This is our test position
                     word += letter
                 elif curr_node.tile:
-                    word += curr_node.tile.letter
+                    word += curr_node.tile.get_letter()
                 else:
                     break
                 
@@ -474,28 +481,23 @@ def find_all_moves(board, rack, dict):
     Returns:
         List of valid moves with scores
     """
-    print("finding all anchors")
     valid_moves = []
-    anchor_points = find_anchor_points(board)
-    
-    print(anchor_points)
-    
+    anchor_points = find_anchor_points(board)    
     # Find moves for each anchor point in both directions
     for row, col in anchor_points:
-        print("finding moves at all anchors")
         # Try horizontal placement
         right_moves = find_moves_at_anchor(dict, board, row, col, rack, "right")
-        print(f"RIGHT: {right_moves}")
+        # print(f"RIGHT: {right_moves}")
         if right_moves:
             valid_moves = valid_moves + right_moves
          
         # Try vertical placement
         down_moves = find_moves_at_anchor(dict, board, row, col, rack, "down")
-        print(f"DOWN: {down_moves}")
+        # print(f"DOWN: {down_moves}")
         if down_moves:
             valid_moves = valid_moves + down_moves
     
-    print(f"VALID: {valid_moves}")
+    # print(f"VALID: {valid_moves}")
     # Sort moves by score (highest first)
     return valid_moves
 
@@ -517,6 +519,9 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
         # Calculate the starting position for this prefix length
         if direction == "right":
             start_row, start_col = anchor_row, anchor_col - prefix_length
+            while check and check.tile:
+                i += 1
+                check = board.get_node(start_row, start_col - i)
         else:  # direction == 'down'
             start_row, start_col = anchor_row - prefix_length, anchor_col
         
@@ -619,7 +624,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
     node = board.get_node(row, col)
     if not node:
         # We've gone off the board, so check if we have a valid word
-        if dict_node.is_terminal and word_has_anchor and partial_word and dict.is_word(partial_word):
+        if dict_node.is_terminal and word_has_anchor and partial_word:
             # We have a complete word that uses an anchor
             record_move(partial_word, placed_tiles, direction, valid_moves, board)
         return
@@ -700,7 +705,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                             word_has_anchor or remaining_prefix==0,  # A tile at the anchor counts
                             valid_moves
                         )
-                print("blank recursion is done#################")
+                # print("blank recursion is done#################")
             else:
                 # Regular tile
                 next_node = dict_node.get_child(tile)
@@ -734,7 +739,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
             # print(f"Curr word is {partial_word}")
         
         # If we have a valid word so far and we've used an anchor, record it
-    if dict_node.is_terminal and word_has_anchor and partial_word and placed_tiles:
+    if dict_node.is_terminal and word_has_anchor and partial_word and placed_tiles and not ((node.right and node.right.tile) or (node.down and node.down.tile)):
         # Add to list of valid moves
         record_move(partial_word, placed_tiles, direction, valid_moves, board)
     
