@@ -98,10 +98,6 @@ class ScrabbleAI(Player):
     def get_astar_move(self):
         """TO BE IMPLEMENTED"""
         return
-
-    def get_mcts_move(self):
-        """TO BE IMPLEMENTED"""
-        return
     
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
 
