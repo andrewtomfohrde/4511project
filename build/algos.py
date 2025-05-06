@@ -502,7 +502,6 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
             start_row, start_col = anchor_row - prefix_length, anchor_col
         
         # Find all words that can be placed starting at this position
-        print(f"generating prefixes to hit anchor at {anchor_row} ,{anchor_col}")
         generate_moves(dict, start_row, start_col, rack, direction, prefix_length, board, valid_moves) ############### what to set this to?
     
     return valid_moves
@@ -718,7 +717,6 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
         # If we have a valid word so far and we've used an anchor, record it
     if dict_node.is_terminal and word_has_anchor and partial_word and placed_tiles:
         # Add to list of valid moves
-        print("SAVING MOVE FINALLY!!!")
         record_move(partial_word, placed_tiles, direction, valid_moves, board)
     
 
@@ -763,7 +761,6 @@ def record_move(word, placed_tiles, direction, valid_moves, board):
     
     # Create move record
     move = [word, position, direction, placed_tiles, score]
-    print(f"{word} has been saved at {position} in {direction} for {score} points")
     # Add to list of valid moves
     valid_moves.append(move)
     return valid_moves

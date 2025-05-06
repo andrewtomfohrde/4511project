@@ -37,7 +37,7 @@ LETTER_VALUES = {"A": 1,
                  "X": 8,
                  "Y": 4,
                  "Z": 10,
-                 "#": 0}
+                 "#": 10}
 
 class ScrabbleBoard:
     class BoardNode(object):
@@ -204,7 +204,7 @@ class ScrabbleBoard:
                     # For blank tiles, look for '#'
                     if is_blank and tile.get_letter() == '#':
                         used_tile = tile
-                        node.place_blank(used_tile, placed_tiles[i][1])
+                        node.place_blank(used_tile, letter)
                         print(f"Placing tile # as {placed_tiles[i][1]}")
                         break
                     # For regular tiles, look for matching letter

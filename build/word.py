@@ -243,7 +243,7 @@ class Word:
         if self.board.get_node(7,7).tile:
             secondary_words = self.find_secondary_words(place_tiles)
             for word in secondary_words:
-                if word not in dictionary and len(word) > 1:
+                if not dictionary.is_word(word) and len(word) > 1:
                     print(f"Secondary word '{word}' not found in dictionary. Try again.")
                     return False, place_tiles
         
