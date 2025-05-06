@@ -120,6 +120,8 @@ def get_dfs_move(board, rack):
     valid_moves = find_all_moves(board, rack, dict)
     move_tree = create_word_tree(valid_moves, rack)
 
+    
+
     curr = move_tree.root
     return dfs_search(curr)
 
@@ -173,11 +175,13 @@ def rack_score(placed, rack):
     con = 0
     vow = 0
     new_rack = []
+    total_rack_score = 0
     rack_arr = rack.get_rack_arr()
     i = 0
     for tile in rack_arr:
         el = tile.get_letter()
         new_rack.append(el)
+        total_rack_score += LETTER_VALUES[el]
         i = i + 1
 
     for location, letter in placed:
@@ -187,8 +191,10 @@ def rack_score(placed, rack):
                 score += 1
             elif letter in ['A', 'E', 'I', 'O', 'U']:
                 vow += 1
+                total_rack_score -= 1
             else:
                 con += 1
+                total_rack_score -= LETTER_VALUES[letter]
     
     diff = con - vow
     if abs(diff) <= 1:
@@ -199,6 +205,8 @@ def rack_score(placed, rack):
         score -= 2
     elif abs(diff) >= 3:
         score -= 1
+    
+    score += total_rack_score
     
     return score
 
