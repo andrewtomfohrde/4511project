@@ -413,3 +413,31 @@ class Word:
     
     def set_blank_pos(self, pos):
         self.blank_positions = pos
+
+def load_dictionary_from_file(file_path):
+    """
+    Load dictionary from a file and create a trie data structure.
+    Args:
+        file_path: Path to the dictionary file
+    Returns:
+        A DictionaryTrie object containing all words from the file
+    """
+    dictionary = DictionaryTrie()
+    
+    try:
+        with open(file_path, 'r') as file:
+            for line in file:
+                # Strip whitespace and ignore empty lines
+                word = line.strip()
+                if word:
+                    dictionary.add_word(word)
+        
+        print(f"Successfully loaded dictionary from {file_path}")
+        return dictionary
+    
+    except FileNotFoundError:
+        print(f"Error: Dictionary file not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error loading dictionary: {str(e)}")
+        return None
