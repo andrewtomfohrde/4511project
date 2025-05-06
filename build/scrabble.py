@@ -2,7 +2,7 @@ from random import shuffle
 import re
 from dictionarytrie import DictionaryTrie
 from word import Word, load_dictionary_from_file
-from algos import ScrabbleAI, MCTS
+from algos import ScrabbleAI
 from player import Tile, Bag, Rack, Player
 
 # from mcts_scrabble import monte_carlo_tree_search
