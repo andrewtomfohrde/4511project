@@ -89,7 +89,7 @@ class ScrabbleAI(Player):
             return get_dfs_move(self.board, self.rack, self.dict)
         else:
             # Default to Monte Carlo Tree Search strategy
-            return get_mcts_move()
+            return get_mcts_move(self.board, self.rack, self.dict)
     
     def get_gbfs_move(self):
         """TO BE IMPLEMENTED"""
@@ -98,12 +98,100 @@ class ScrabbleAI(Player):
     def get_astar_move(self):
         """TO BE IMPLEMENTED"""
         return
-
-    def get_mcts_move(self):
-        """TO BE IMPLEMENTED"""
-        return
     
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
+
+def get_mcts_move(board, rack, dict):
+    from copy import deepcopy
+    import random
+    import math
+
+    def best_child(node_children, parent_visits, c_param=1.4):
+        def uct(child):
+            exploitation = child['total_score'] / (child['visits'] + 1e-4)
+            exploration = c_param * math.sqrt(math.log(parent_visits + 1) / (child['visits'] + 1e-4))
+            return exploitation + exploration
+        return max(node_children, key=uct)
+
+    def rollout(state):
+        legal_moves = state['legal_moves']
+        if not legal_moves:
+            return 0
+        move = random.choice(legal_moves)
+        word_obj = Word(move[0], list(move[1]), state['player'], move[2], state['board'])
+        if word_obj.check_word():
+            state['player'].score = 0
+            word_obj.calculate_word_score(move[3])
+            score = state['player'].get_score()
+            state['player'].score = 0
+            return score
+        return 0
+
+    def expand(node):
+        tried = [child['move'] for child in node['children']]
+        untried = [m for m in node['state']['legal_moves'] if m not in tried]
+        if not untried:
+            return node
+        move = random.choice(untried)
+        new_state = deepcopy(node['state'])
+        new_state['legal_moves'].remove(move)
+        child_node = {
+            'state': new_state,
+            'move': move,
+            'visits': 0,
+            'total_score': 0,
+            'children': [],
+            'parent': node
+        }
+        node['children'].append(child_node)
+        return child_node
+
+    def backpropagate(node, result):
+        while node:
+            node['visits'] += 1
+            node['total_score'] += result
+            node = node['parent']
+
+    valid_moves = find_all_moves(board, rack, dict)
+    if not valid_moves:
+        return None
+
+    # Create a dummy player with valid bag (copied from the rack)
+    dummy_player = Player(rack.bag)  # Use same bag
+    dummy_player.rack = rack.copy()  # Copy the rack
+
+    root_state = {
+        'board': board,
+        'player': dummy_player,
+        'legal_moves': valid_moves.copy()
+    }
+    root = {
+        'state': root_state,
+        'move': None,
+        'visits': 0,
+        'total_score': 0,
+        'children': [],
+        'parent': None
+    }
+
+    for _ in range(250):  # Adjustable simulation count
+        node = root
+        while node['children'] and len(node['children']) == len(node['state']['legal_moves']):
+            node = best_child(node['children'], node['visits'])
+
+        leaf = expand(node)
+        result = rollout(leaf['state'])
+        backpropagate(leaf, result)
+
+    if not root['children']:
+        return None
+
+    best = max(root['children'], key=lambda c: c['visits'])
+    word, pos, direction = best['move'][0], best['move'][1], best['move'][2]
+    return [word, pos, direction]
+
+
+
     
 def get_bfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
@@ -702,7 +790,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                             direction,
                             max(0, remaining_prefix - 1),
                             new_placed_tiles,
-                            word_has_anchor or remaining_prefix==0,  # A tile at the anchor counts
+                            word_has_anchor,  # A tile at the anchor counts
                             valid_moves
                         )
                 # print("blank recursion is done#################")
@@ -733,7 +821,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                         direction,
                         max(0, remaining_prefix - 1),
                         new_placed_tiles,
-                        word_has_anchor or remaining_prefix==0,  # A tile at the anchor counts
+                        word_has_anchor,  # A tile at the anchor counts
                         valid_moves
                     )
             # print(f"Curr word is {partial_word}")
@@ -1012,78 +1100,78 @@ def calculate_cross_word_score(board, row, col, letter, direction):
 
 
 
-class MCTS:
-    def __init__(self, state, parent=None, move=None):
-        self.state = state
-        self.parent = parent
-        self.move = move  # e.g., {'word': ..., 'position': ..., 'direction': ..., 'score': ...}
-        self.children = []
-        self.visits = 0
-        self.total_score = 0
+# class MCTS:
+#     def __init__(self, state, parent=None, move=None):
+#         self.state = state
+#         self.parent = parent
+#         self.move = move  # e.g., {'word': ..., 'position': ..., 'direction': ..., 'score': ...}
+#         self.children = []
+#         self.visits = 0
+#         self.total_score = 0
 
-    def is_fully_expanded(self):
-        return len(self.children) == len(self.state['legal_moves'])
+#     def is_fully_expanded(self):
+#         return len(self.children) == len(self.state['legal_moves'])
 
-    def best_child(self, c_param=1.4):
-        return max(
-            self.children,
-            key=lambda c: (c.total_score / (c.visits + 1e-4)) + c_param * ((2 * math.log(self.visits + 1)) / (c.visits + 1e-4))**0.5
-        )
+#     def best_child(self, c_param=1.4):
+#         return max(
+#             self.children,
+#             key=lambda c: (c.total_score / (c.visits + 1e-4)) + c_param * ((2 * math.log(self.visits + 1)) / (c.visits + 1e-4))**0.5
+#         )
 
-def rollout(state):
-    """Simulate placing a random legal move using game logic, and return the resulting score."""
-    legal_moves = state['legal_moves']
-    if not legal_moves:
-        return 0
+# def rollout(state):
+#     """Simulate placing a random legal move using game logic, and return the resulting score."""
+#     legal_moves = state['legal_moves']
+#     if not legal_moves:
+#         return 0
 
-    move = random.choice(legal_moves)
-    temp_board = state['board']
-    temp_player = state['player']
+#     move = random.choice(legal_moves)
+#     temp_board = state['board']
+#     temp_player = state['player']
 
-    # Create the Word object and validate the move
+#     # Create the Word object and validate the move
     
-    word_obj = Word(move['word'], list(move['position']), temp_player, move['direction'], temp_board)
-    if word_obj.check_word() is True:
-        # Simulate scoring
-        temp_player.score = 0
-        word_obj.calculate_word_score()
-        score = temp_player.get_score()
-        temp_player.score = 0  # Reset score after simulation
-        return score
+#     word_obj = Word(move['word'], list(move['position']), temp_player, move['direction'], temp_board)
+#     if word_obj.check_word() is True:
+#         # Simulate scoring
+#         temp_player.score = 0
+#         word_obj.calculate_word_score()
+#         score = temp_player.get_score()
+#         temp_player.score = 0  # Reset score after simulation
+#         return score
 
-    return 0  # Invalid move
+#     return 0  # Invalid move
 
-def expand(node):
-    """Add a new child node from the list of untried moves."""
-    tried_moves = [child.move for child in node.children]
-    untried_moves = [m for m in node.state['legal_moves'] if m not in tried_moves]
-    if not untried_moves:
-        return node
-    move = random.choice(untried_moves)
-    new_state = copy.deepcopy(node.state)
-    new_state['legal_moves'].remove(move)
-    child = MCTS(new_state, parent=node, move=move)
-    node.children.append(child)
-    return child
+# def expand(node):
+#     """Add a new child node from the list of untried moves."""
+#     tried_moves = [child.move for child in node.children]
+#     untried_moves = [m for m in node.state['legal_moves'] if m not in tried_moves]
+#     if not untried_moves:
+#         return node
+#     move = random.choice(untried_moves)
+#     new_state = copy.deepcopy(node.state)
+#     new_state['legal_moves'].remove(move)
+#     child = MCTS(new_state, parent=node, move=move)
+#     node.children.append(child)
+#     return child
 
-def backpropagate(node, result):
-    while node:
-        node.visits += 1
-        node.total_score += result
-        node = node.parent
+# def backpropagate(node, result):
+#     while node:
+#         node.visits += 1
+#         node.total_score += result
+#         node = node.parent
 
-def monte_carlo_tree_search(initial_state, iterations=1000):
-    root = MCTS(initial_state)
+# def monte_carlo_tree_search(initial_state, iterations=1000):
+#     root = MCTS(initial_state)
 
-    for _ in range(iterations):
-        node = root
-        while node.is_fully_expanded() and node.children:
-            node = node.best_child()
-        leaf = expand(node)
-        result = rollout(leaf.state)
-        backpropagate(leaf, result)
+#     for _ in range(iterations):
+#         node = root
+#         while node.is_fully_expanded() and node.children:
+#             node = node.best_child()
+#         leaf = expand(node)
+#         result = rollout(leaf.state)
+#         backpropagate(leaf, result)
 
-    best = max(root.children, key=lambda c: c.visits)
-    return best.move
+#     best = max(root.children, key=lambda c: c.visits)
+#     return best.move
 
 
