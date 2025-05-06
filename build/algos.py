@@ -325,6 +325,7 @@ def find_anchor_points(board):
         anchor_points.add(center.position)
         return list(anchor_points)
     
+    print(list(anchor_points))
     return list(anchor_points)
     
 
@@ -618,7 +619,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
     node = board.get_node(row, col)
     if not node:
         # We've gone off the board, so check if we have a valid word
-        if dict_node.is_terminal and word_has_anchor and partial_word:
+        if dict_node.is_terminal and word_has_anchor and partial_word and dict.is_word(partial_word):
             # We have a complete word that uses an anchor
             record_move(partial_word, placed_tiles, direction, valid_moves, board)
         return
@@ -696,7 +697,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                             direction,
                             max(0, remaining_prefix - 1),
                             new_placed_tiles,
-                            word_has_anchor or remaining_prefix==-1,  # A tile at the anchor counts
+                            word_has_anchor or remaining_prefix==0,  # A tile at the anchor counts
                             valid_moves
                         )
                 print("blank recursion is done#################")
@@ -727,7 +728,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                         direction,
                         max(0, remaining_prefix - 1),
                         new_placed_tiles,
-                        word_has_anchor or remaining_prefix==-1,  # A tile at the anchor counts
+                        word_has_anchor or remaining_prefix==0,  # A tile at the anchor counts
                         valid_moves
                     )
             # print(f"Curr word is {partial_word}")

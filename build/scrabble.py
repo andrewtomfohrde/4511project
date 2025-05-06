@@ -386,6 +386,7 @@ class Game:
             # Recursive call for next player's turn
             self.turn(next_player, board, bag)
         else:
+            print(board.get_board())
             self.end_game()
 
     def start_game(self):
@@ -429,7 +430,7 @@ class Game:
         # Create AI players
         num_ais = int(input("Enter number of AI players (2-4): "))
         for i in range(min(num_ais, 4)):
-            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/AStar/GBFS/BFS/DFS): ").upper()
+            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/BEAM/ASTAR/GBFS/BFS/DFS): ").upper()
             ai = ScrabbleAI(self.dictionary, board, bag, ai_strategy)
             self.add_player(ai)
         

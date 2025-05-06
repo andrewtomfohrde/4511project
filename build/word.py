@@ -155,7 +155,7 @@ class Word:
             while ((curr_tile.right and curr_tile.right.tile) or (curr_tile.position == (row, col + i))) and (col + i <= 14):
                 if curr_tile.position == (row, col + i) and len(self.word) > i:
                     full += self.word[i]
-                elif (curr_tile.right and curr_tile.right.tile):
+                elif (curr_tile.right and curr_tile.right.tile and curr_tile.tile):
                     full += curr_tile.tile.letter
                     i = 0
                 else:
@@ -176,7 +176,7 @@ class Word:
             while ((curr_tile.down and curr_tile.down.tile) or (curr_tile.position == (row + i, col))) and (row + i <= 14):
                 if curr_tile.position == (row + i, col) and len(self.word) > i:
                     full += self.word[i]
-                elif (curr_tile.down and curr_tile.down.tile):
+                elif (curr_tile.down and curr_tile.down.tile and curr_tile.tile):
                     full += curr_tile.tile.get_letter()
                     i = 0
                 else:
