@@ -98,7 +98,6 @@ class ScrabbleAI(Player):
     def get_astar_move(self):
         """TO BE IMPLEMENTED"""
         return
-    
 
     def get_mcts_move(self):
         """TO BE IMPLEMENTED"""
@@ -116,29 +115,34 @@ def get_bfs_move(board, rack, dict):
 
     return best_move
 
-def get_dfs_move(board, rack):
+def get_dfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
     move_tree = create_word_tree(valid_moves, rack)
 
-    
-
-    curr = move_tree.root
-    return dfs_search(curr)
+    print(move_tree)
+    return dfs_search(move_tree.root)
 
 def dfs_search(node):
-    children = node.keys()
-    if children:
-        let = children[0]
-        next = node.get_child(let)
-        # If we're at a deeper level or same level but higher score
-        dfs_search(next)
-    else:
-        best_move = [
-            node.word,
-            node.position,
-            node.direction
-        ]
-        # Continue DFS on all children
+    best_move = None
+    best_score = -1
+    
+    if hasattr(node, 'is_terminal') and node.is_terminal:
+        best_move = [node.word, node.position, node.direction]
+        best_score = node.score
+    
+    # Recursively search through all children
+    for letter, child_node in node.children.items():
+        child_result = dfs_search(child_node)
+        
+        # If child_result is not None, it's a list [word, position, direction]
+        # The score is stored in the node
+        if child_result and hasattr(child_node, 'score'):
+            print(f"{child_node.word} set at {child_node.position} wit score {child_node.score}!")
+            child_score = child_node.score
+            if child_score > best_score:
+                best_score = child_score
+                best_move = child_result
+    
     return best_move
 
 def get_beam_move(board, rack):
@@ -315,6 +319,12 @@ def find_anchor_points(board):
                     anchor_points.add(row_node.position)
             row_node = row_node.right
         current_node = current_node.down
+        
+    if not anchor_points:
+        center = board.get_node(7,7)
+        anchor_points.add(center.position)
+        return list(anchor_points)
+    
     return list(anchor_points)
     
 
@@ -626,7 +636,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
             
             # Calculate next position
             next_row, next_col = get_next_position(row, col, direction)
-            new_placed_tiles = placed_tiles + [(None, letter)]
+            new_placed_tiles = placed_tiles + [((row, col), None)]
             # print(f"tiles: {new_placed_tiles}")
             # Continue recursively
             generate_moves_recursive(
@@ -686,7 +696,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                             direction,
                             max(0, remaining_prefix - 1),
                             new_placed_tiles,
-                            word_has_anchor or remaining_prefix == 0,  # A tile at the anchor counts
+                            word_has_anchor,  # A tile at the anchor counts
                             valid_moves
                         )
                 print("blank recursion is done#################")
@@ -717,7 +727,7 @@ def generate_moves_recursive(partial_word, dict, dict_node, row, col, board, ava
                         direction,
                         max(0, remaining_prefix - 1),
                         new_placed_tiles,
-                        word_has_anchor or remaining_prefix == 0,  # A tile at the anchor counts
+                        word_has_anchor,  # A tile at the anchor counts
                         valid_moves
                     )
             # print(f"Curr word is {partial_word}")
@@ -789,48 +799,84 @@ def calculate_placement_score(placed_tiles, board, direction):
     tiles_used = 0
     
     # First pass: calculate the main word score and any cross-word scores
-    for position, letter in placed_tiles:
-        if position:
-            row, col = position
-            node = board.get_node(row, col)
-            
-            if not node:
-                continue
-                
-            # If this is a tile we're placing (not an existing one)
-            if letter is not None:
-                letter_score = LETTER_VALUES[letter]
-                tiles_used += 1
-                
-                # Apply letter multipliers
-                if node.score_multiplier == "TLS":
-                    letter_score *= 3
-                elif node.score_multiplier == "DLS":
-                    letter_score *= 2
-                
-                # Track word multipliers for the main word
-                if node.score_multiplier == "TWS":
-                    main_word_multiplier *= 3
-                elif node.score_multiplier == "DWS":
-                    main_word_multiplier *= 2
-                
-                main_word_score += letter_score
-                
-                # Check for cross-words formed
-                cross_word_score = calculate_cross_word_score(board, row, col, letter, direction)
-                total_score += cross_word_score
+    global LETTER_VALUES
+    total_score = 0
+    curr_score = 0
+    sec_score = 0
+    xls = 1
+    fxws = 1
+    sxws = 1
+    sec = False
+    sec_val = 0
+    tiles_used = 0
+    
+    # Create a temporary board to place the word for scoring
+    for tile in placed_tiles:
+        sec = False
+        sec_score = 0
+        xls = 1
+        sxws = 1
+        location, letter = tile
+        if location:
+            row, col = location
+            curr_node = board.get_node(row, col)
+        if letter != None:
+            if curr_node.score_multiplier in ["TWS", "DWS", "TLS", "DLS"] and curr_node.tile:
+                if curr_node.score_multiplier != "": 
+                    if curr_node.score_multiplier == "TWS":
+                        fxws *= 3
+                        sxws *= 3
+                    elif curr_node.score_multiplier == "DWS":
+                        fxws *= 2
+                        sxws *= 2
+                    elif curr_node.score_multiplier == "TLS":
+                        xls *= 3
+                    else:
+                        xls *= 2
+            if direction == "right":
+                while curr_node.up and curr_node.up.tile:
+                    curr_node = curr_node.up
+                while curr_node.tile:
+                    tile = curr_node.tile
+                    letter_score = LETTER_VALUES[tile.get_letter()]
+                    if curr_node.position == (row, col):
+                        letter_score = letter_score * xls
+                        sec_val = letter_score
+                        curr_score += letter_score
+                    else:
+                        sec_score += (letter_score * sxws)
+                        sec = True
+                    curr_node = curr_node.down
+                if sec:
+                    sec_score += sec_val
+                total_score += (sec_score * sxws)
+            else:
+                while curr_node.left and curr_node.left.tile:
+                    curr_node = curr_node.left
+                while curr_node.tile:
+                    tile = curr_node.tile
+                    letter_score = LETTER_VALUES[tile.get_letter()]
+                    if curr_node.position == (row, col):
+                        sec_val = letter_score * xls
+                        letter_score = letter_score * xls
+                        curr_score += letter_score
+                    else:
+                        sec_score += (letter_score * sxws)
+                        sec = True
+                    curr_node = curr_node.right
+                if sec:
+                    sec_score += sec_val
+                total_score += (sec_score * sxws)
+            tiles_used += 1
         else:
-            # This is an existing tile we're using
-            letter_score = LETTER_VALUES[letter]
-            main_word_score += letter_score
+            tile = curr_node.tile
+            letter_score = LETTER_VALUES[tile.get_letter()]
+            curr_score += letter_score
+    total_score += (curr_score * fxws)
     
-    # Apply the word multiplier to the main word
-    total_score += (main_word_score * main_word_multiplier)
-    
-    # Bonus for using all 7 tiles
     if tiles_used == 7:
         total_score += 50
-        
+    
     return total_score
     
 def calculate_cross_word_score(board, row, col, letter, direction):

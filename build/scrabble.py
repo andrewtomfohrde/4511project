@@ -37,7 +37,7 @@ LETTER_VALUES = {"A": 1,
                  "X": 8,
                  "Y": 4,
                  "Z": 10,
-                 "#": 10}
+                 "#": 2}
 
 class ScrabbleBoard:
     class BoardNode(object):
