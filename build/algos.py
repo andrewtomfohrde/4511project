@@ -605,6 +605,8 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
     """
     valid_moves = []
     
+    placed = []
+    
     # Find the maximum prefix length (how far we can go before the anchor)
     prefix_limit = calculate_prefix_limit(board, anchor_row, anchor_col, direction)
    
@@ -617,14 +619,13 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
             # Check if there are existing tiles before our starting position
             # and adjust start position if necessary
             prefix_letters = ""
-            first_col = -1
             i = 1
             while True:
                 check = board.get_node(start_row, start_col - i)
                 if check and check.tile:
                     prefix_letters = check.tile.get_letter() + prefix_letters
+                    placed = [((start_row, start_col - i), None)] + placed
                     i += 1
-                    first_col = start_col - i
                 else:
                     break
                     
@@ -634,14 +635,13 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
             # Check if there are existing tiles before our starting position
             # and adjust start position if necessary
             prefix_letters = ""
-            first_col = -1
             i = 1
             while True:
                 check = board.get_node(start_row - i, start_col)
                 if check and check.tile:
                     prefix_letters = check.tile.get_letter() + prefix_letters
+                    placed = [((start_row - i, start_col), None)] + placed
                     i += 1
-                    first_col = start_row - i
                 else:
                     break
        
@@ -670,7 +670,7 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
                 rack_copy,  # Pass a copy of the rack to avoid modifying the original
                 direction,
                 prefix_length,
-                [],
+                placed,
                 False,  # Will become true when we place/use a tile at the anchor
                 valid_moves
             )
@@ -732,15 +732,18 @@ def generate_moves_recursive(partial_word, dictionary, dict_node, row, col, boar
     """
     # Check if we're still on the board
     node = board.get_node(row, col)
+    next_row, next_col = get_next_position(row, col, direction)
     if not node:
         # We've gone off the board, so check if we have a valid word
         if dict_node.is_terminal and word_has_anchor and partial_word and placed_tiles:
             # We have a complete word that uses an anchor
-            record_move(partial_word, placed_tiles, direction, valid_moves, board)
+            next_node = board.get_node(next_row, next_col)
+            if not next_node or not next_node.tile:
+                record_move(partial_word, placed_tiles, direction, valid_moves, board)    
         return
     
     # Calculate next position for future recursion
-    next_row, next_col = get_next_position(row, col, direction)
+    
     
     # If this square is already occupied, we must use that letter
     if node.tile:
@@ -771,11 +774,7 @@ def generate_moves_recursive(partial_word, dictionary, dict_node, row, col, boar
         # The square is empty, we can place any letter from our rack
         
         # If we need to place a prefix tile, we can use any tile from rack
-        if remaining_prefix > 0:
-            valid_letters = rack
-        else:
-            # Get the set of valid letters based on cross-checks
-            valid_letters = get_cross_checks(board, dictionary, row, col, direction)
+        valid_letters = get_cross_checks(board, dictionary, row, col, direction)
         
         # For each tile in the rack
         rack_copy = rack.copy()  # Work with a copy to avoid modifying the original

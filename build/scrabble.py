@@ -172,6 +172,7 @@ class ScrabbleBoard:
         direction = direction.lower()
         word = word.upper()
         used_tiles = []
+        placed = False
         
         start_row, start_col = location
         
@@ -198,8 +199,10 @@ class ScrabbleBoard:
             
             if node is not None and node.tile is not None:
                 print("Tile already placed in previous move\n")
+                placed = False
                 
             else:
+                placed = True
                 for tile in player.rack.get_rack_arr():
                     # For blank tiles, look for '#'
                     if is_blank and tile.get_letter() == '#':
@@ -221,24 +224,13 @@ class ScrabbleBoard:
                             if tile.get_letter() == '#':
                                 used_tile = tile
                                 is_blank = True
-                                print(f"Using {used_tile.get_letter()} to fill in gaps of your play.")
+                                print(f"Using {used_tile.get_letter()} to fill '{letter}' in for your play.")
                                 node.place_blank(used_tile, letter)
                                 break
+            if placed:
+                print(f"Removing {tile.get_letter()} from rack")
+                player.rack.remove_from_rack(tile)
             
-            if used_tile:
-                used_tiles.append(used_tile)
-                
-                # Place the tile on the board
-                #(used_tile, letter)        
-        
-        # # Apply word multiplier
-        # total_score *= word_multiplier
-        
-        # Remove used tiles from rack
-        for tile in used_tiles:
-            print(f"Removing {tile.get_letter()} from rack")
-            player.rack.remove_from_rack(tile)
-        
         # Replenish rack
         player.rack.replenish_rack()
 
