@@ -167,10 +167,10 @@ class Word:
             row, col = self.location
             curr_tile = self.board.get_node(row, col)
             i = 1
-            while (curr_tile.up.tile) and (row - i >= 0):
+            while (row - i >= 0) and (curr_tile.up.tile):
                 curr_tile = curr_tile.up
                 i += 1
-                if (not curr_tile.up.tile) or (row - i == 0):
+                if (row - i == 0) or (not curr_tile.up.tile):
                     break
             i = 0
             while ((curr_tile and curr_tile.down and curr_tile.down.tile) or (curr_tile and curr_tile.position == (row + i, col))) and (row + i <= 14):

@@ -5,6 +5,7 @@ import math
 import random
 import copy
 from collections import deque
+import heapq
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
@@ -77,7 +78,7 @@ class ScrabbleAI(Player):
             return get_gbfs_move()
         elif self.name == "AI_ASTAR":
             # A* strategy
-            return get_astar_move()
+            return get_astar_move(self.board, self.rack, self.dict)
         elif self.name == "AI_BEAM":
             # Beam strategy
             return get_beam_move(self.board, self.rack)
@@ -95,9 +96,6 @@ class ScrabbleAI(Player):
         """TO BE IMPLEMENTED"""
         return
     
-    def get_astar_move(self):
-        """TO BE IMPLEMENTED"""
-        return
     
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
 
@@ -128,17 +126,32 @@ def get_mcts_move(board, rack, dict):
     
 def get_bfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
-    best_move = None
+    move_tree = create_word_tree(valid_moves, rack, False)
 
-    if valid_moves:
-        word, pos, dir, placed, score = valid_moves[0]
-        best_move = [word, pos, dir]
+    return bfs_search(move_tree.root)
+
+def bfs_search(node):
+    best_move = None
+    best_score = -1
+    # Recursively search through all children
+    queue = deque([node])
+
+    while queue:
+        node = queue.popleft()
+
+        if hasattr(node, 'is_terminal') and node.is_terminal:
+            if hasattr(node, 'score') and node.score > best_score:
+                best_score = node.score
+                best_move = [node.word, node.position, node.direction]
+
+        for child_node in node.children.values():
+            queue.append(child_node)
 
     return best_move
 
 def get_dfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
-    move_tree = create_word_tree(valid_moves, rack)
+    move_tree = create_word_tree(valid_moves, rack, False)
 
     return dfs_search(move_tree.root)
 
@@ -146,30 +159,59 @@ def dfs_search(node):
     best_move = None
     best_score = -1
     
-    if hasattr(node, 'is_terminal') and node.is_terminal:
-        best_move = [node.word, node.position, node.direction]
-        best_score = node.score
+    stack = [node]
     
-    # Recursively search through all children
-    for letter, child_node in node.children.items():
-        child_result = dfs_search(child_node)
-        
-        # If child_result is not None, it's a list [word, position, direction]
-        # The score is stored in the node
-        if child_result and hasattr(child_node, 'score'):
-            child_score = child_node.score
-            if child_score > best_score:
-                best_score = child_score
-                best_move = child_result
+    while stack:
+        node = stack.pop()
     
-    return best_move
+        if hasattr(node, 'is_terminal') and node.is_terminal:
+            if hasattr(node, 'score') and node.score > best_score:
+                best_score = node.score
+                best_move = [node.word, node.position, node.direction]
 
+        # Add children to the stack
+        for child_node in node.children.values():
+            stack.append(child_node)
+        
+    return best_move
 
 def get_astar_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
-    move_tree = create_word_tree(valid_moves, rack)
+    move_tree = create_word_tree(valid_moves, rack, True)
+    
+    return astar_search(move_tree.root)
 
-
+def astar_search(node):
+    best_move = None
+    best_score = -1
+    
+    # Use a counter to break ties in the priority queue
+    counter = 0
+    
+    # Priority queue stores tuples of (-score, counter, node)
+    # Using negative score because heapq is a min-heap but we want max score
+    pq = [(-node.score if hasattr(node, 'score') else 0, counter, node)]
+    counter += 1
+    
+    while pq:
+        # Get node with highest priority (highest score)
+        _, _, current_node = heapq.heappop(pq)
+        
+        # Check if this is a terminal node with a valid move
+        if hasattr(current_node, 'is_terminal') and current_node.is_terminal:
+            if hasattr(current_node, 'score') and current_node.score > best_score:
+                best_score = current_node.score
+                best_move = [current_node.word, current_node.position, current_node.direction]
+        
+        # Add all children to the priority queue
+        for child_node in current_node.children.values():
+            # Only consider nodes that have a score attribute
+            if hasattr(child_node, 'score'):
+                heapq.heappush(pq, (-child_node.score, counter, child_node))
+                counter += 1
+    
+    return best_move
+    
 
 def get_beam_move(board, rack):
 
@@ -185,22 +227,23 @@ def get_beam_move(board, rack):
     return best_move
 
     
-def create_word_tree(moves, rack):
+def create_word_tree(moves, rack, h):
     move_tree = DictionaryTrie()
     first_word = ""
     for word, pos, dir, placed, score in moves:
+        if h:
+            score = score + rack_score(placed, rack)
         check = move_tree.get_node(word)
-        new_score = score + rack_score(placed, rack)
-        if check and check.is_terminal and check.score < new_score:
-            check.set_attr(word, pos, dir, new_score)
+        if check and check.is_terminal and check.score < score:
+            check.set_attr(word, pos, dir, score)
         elif not check:
             curr = move_tree.add_word(word)
-            curr.set_attr(word, pos, dir, new_score)
+            curr.set_attr(word, pos, dir, score)
     
     return move_tree
 
 
-def rack_score(placed, rack):
+def rack_score(placed, rack): # used in astar search
     score = 0
     con = 0
     vow = 0
@@ -218,26 +261,29 @@ def rack_score(placed, rack):
         if letter in new_rack:
             new_rack.remove(letter)
             if letter == "#":
-                score += 1
+                score += 3
             elif letter in ['A', 'E', 'I', 'O', 'U']:
                 vow += 1
                 total_rack_score -= 1
             else:
                 con += 1
                 total_rack_score -= LETTER_VALUES[letter]
+        i = i - 1
     
     diff = con - vow
     if abs(diff) <= 1:
-        score += 2
+        score += 4
     elif abs(diff) >= 5:
-        score -= 3
+        score -= 6
     elif abs(diff) >= 4:
-        score -= 2
+        score -= 4
     elif abs(diff) >= 3:
-        score -= 1
-    
-    score += total_rack_score
-    
+        score -= 2
+        
+    for tile in new_rack:
+        if (diff >= 3) and (tile in ['Z', 'Q']):
+            score -= 5
+
     return score
 
 def beam_search(move_tree, beam_width=10):
