@@ -180,7 +180,7 @@ def backpropagate(node, result):
         node.total_score += result
         node = node.parent
         
-
+### MCTS ^^^
     
 def get_bfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
@@ -207,6 +207,8 @@ def bfs_search(node):
 
     return best_move
 
+###
+
 def get_dfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
     move_tree = create_word_tree(valid_moves, rack, False)
@@ -232,6 +234,8 @@ def dfs_search(node):
             stack.append(child_node)
         
     return best_move
+
+###
 
 def get_astar_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
@@ -269,6 +273,8 @@ def astar_search(node):
                 counter += 1
     
     return best_move
+
+###
     
 def get_dijkstra_move(board, rack, dict): ## same thing as Uniform Cost Search (UCS)
     valid_moves = find_all_moves(board, rack, dict)
@@ -340,83 +346,7 @@ def dijkstra_search(node):
     
     return best_move
 
-def get_mcts_move(board, rack, dict):
-    valid_moves = find_all_moves(board, rack, dict)
-    move_tree = create_word_tree(valid_moves, rack, False)
-    
-    mcts_search(board, rack, dict, 1000, 1.0)
-    
-def mcts_search(board, rack, dictionary, num_simulations=1000, exploration_weight=1.0):
-    """
-    Use Monte Carlo Tree Search to find the best move.
-    
-    Args:
-        board: The current ScrabbleBoard
-        rack: The current player's rack
-        dictionary: The DictionaryTrie object
-        num_simulations: Number of simulations to run
-        exploration_weight: Controls exploration vs exploitation
-        
-    Returns:
-        The best move found
-    """
-    # First, generate candidate moves
-    
-    # Create game state
-    game_state = {
-        'board': board,
-        'bag': get_current_bag(),  # You'll need to implement this
-        'players': get_players(),  # You'll need to implement this
-        'current_player': get_current_player()  # You'll need to implement this
-    }
-    
-    # Dictionary to store statistics for each move
-    move_stats = {move: {'wins': 0, 'plays': 0} for move in candidate_moves}
-    
-    # Run simulations
-    for _ in range(num_simulations):
-        # Select a move to explore
-        # Use UCB1 formula for selection
-        best_move = None
-        best_value = float('-inf')
-        
-        for move in candidate_moves:
-            stats = move_stats[move]
-            
-            # If move hasn't been played yet, prioritize it
-            if stats['plays'] == 0:
-                best_move = move
-                break
-                
-            # Calculate UCB1 value
-            exploitation = stats['wins'] / stats['plays']
-            exploration = exploration_weight * (2 * (total_plays := sum(s['plays'] for s in move_stats.values())) / stats['plays'])
-            ucb_value = exploitation + exploration
-            
-            if ucb_value > best_value:
-                best_value = ucb_value
-                best_move = move
-        
-        # Simulate the game after making this move
-        # Create a deep copy of the game state
-        sim_game_state = Simulation.deep_copy_game_state(game_state)
-        
-        # Make the move in the simulation
-        make_move_in_simulation(sim_game_state, best_move)
-        
-        # Play the game to completion and get the result
-        result = simulate_to_end(sim_game_state)
-        
-        # Update statistics
-        stats = move_stats[best_move]
-        stats['plays'] += 1
-        if result > 0:  # If the current player won
-            stats['wins'] += 1
-    
-    # Choose the move with the best win rate
-    best_move = max(candidate_moves, key=lambda move: move_stats[move]['wins'] / move_stats[move]['plays'] if move_stats[move]['plays'] > 0 else 0)
-    
-    return best_move
+###
 
 def get_beam_move(board, rack):
     if not rack or not board:
@@ -442,10 +372,8 @@ def create_word_tree(moves, rack, h):
             check.set_attr(word, pos, dir, score)
         elif not check:
             curr = move_tree.add_word(word)
-            curr.set_attr(word, pos, dir, score)
-    
+            curr.set_attr(word, pos, dir, score)    
     return move_tree
-
 
 def rack_score(placed, rack): # used in astar search
     score = 0
@@ -1148,155 +1076,3 @@ def calculate_placement_score(placed_tiles, board, direction):
         total_score += 50
     
     return total_score
-
-# def get_mcts_move(board, rack, dictionary, num_simulations=1000, exploration_weight=1.0):
-#     """
-#     Use Monte Carlo Tree Search to find the best move.
-    
-#     Args:
-#         board: The current ScrabbleBoard
-#         rack: The current player's rack
-#         dictionary: The DictionaryTrie object
-#         num_simulations: Number of simulations to run
-#         exploration_weight: Controls exploration vs exploitation
-        
-#     Returns:
-#         The best move found
-#     """
-#     # First, generate candidate moves
-#     candidate_moves = find_all_moves(board, rack, dictionary)
-    
-#     if not candidate_moves:
-#         return None  # No valid moves
-    
-#     # Create game state
-#     game_state = {
-#         'board': board,
-#         'bag': get_current_bag(),  # You'll need to implement this
-#         'players': get_players(),  # You'll need to implement this
-#         'current_player': get_current_player()  # You'll need to implement this
-#     }
-    
-#     # Dictionary to store statistics for each move
-#     move_stats = {move: {'wins': 0, 'plays': 0} for move in candidate_moves}
-    
-#     # Run simulations
-#     for _ in range(num_simulations):
-#         # Select a move to explore
-#         # Use UCB1 formula for selection
-#         best_move = None
-#         best_value = float('-inf')
-        
-#         for move in candidate_moves:
-#             stats = move_stats[move]
-            
-#             # If move hasn't been played yet, prioritize it
-#             if stats['plays'] == 0:
-#                 best_move = move
-#                 break
-                
-#             # Calculate UCB1 value
-#             exploitation = stats['wins'] / stats['plays']
-#             exploration = exploration_weight * (2 * (total_plays := sum(s['plays'] for s in move_stats.values())) / stats['plays'])
-#             ucb_value = exploitation + exploration
-            
-#             if ucb_value > best_value:
-#                 best_value = ucb_value
-#                 best_move = move
-        
-#         # Simulate the game after making this move
-#         # Create a deep copy of the game state
-#         sim_game_state = Simulation.deep_copy_game_state(game_state)
-        
-#         # Make the move in the simulation
-#         make_move_in_simulation(sim_game_state, best_move)
-        
-#         # Play the game to completion and get the result
-#         result = simulate_to_end(sim_game_state)
-        
-#         # Update statistics
-#         stats = move_stats[best_move]
-#         stats['plays'] += 1
-#         if result > 0:  # If the current player won
-#             stats['wins'] += 1
-    
-#     # Choose the move with the best win rate
-#     best_move = max(candidate_moves, key=lambda move: move_stats[move]['wins'] / move_stats[move]['plays'] if move_stats[move]['plays'] > 0 else 0)
-    
-#     return best_move
-
-# class MCTS:
-#     def __init__(self, state, parent=None, move=None):
-#         self.state = state
-#         self.parent = parent
-#         self.move = move  # e.g., {'word': ..., 'position': ..., 'direction': ..., 'score': ...}
-#         self.children = []
-#         self.visits = 0
-#         self.total_score = 0
-
-#     def is_fully_expanded(self):
-#         return len(self.children) == len(self.state['legal_moves'])
-
-#     def best_child(self, c_param=1.4):
-#         return max(
-#             self.children,
-#             key=lambda c: (c.total_score / (c.visits + 1e-4)) + c_param * ((2 * math.log(self.visits + 1)) / (c.visits + 1e-4))**0.5
-#         )
-
-# def rollout(state):
-#     """Simulate placing a random legal move using game logic, and return the resulting score."""
-#     legal_moves = state['legal_moves']
-#     if not legal_moves:
-#         return 0
-
-#     move = random.choice(legal_moves)
-#     temp_board = state['board']
-#     temp_player = state['player']
-
-#     # Create the Word object and validate the move
-    
-#     word_obj = Word(move['word'], list(move['position']), temp_player, move['direction'], temp_board)
-#     if word_obj.check_word() is True:
-#         # Simulate scoring
-#         temp_player.score = 0
-#         word_obj.calculate_word_score()
-#         score = temp_player.get_score()
-#         temp_player.score = 0  # Reset score after simulation
-#         return score
-
-#     return 0  # Invalid move
-
-# def expand(node):
-#     """Add a new child node from the list of untried moves."""
-#     tried_moves = [child.move for child in node.children]
-#     untried_moves = [m for m in node.state['legal_moves'] if m not in tried_moves]
-#     if not untried_moves:
-#         return node
-#     move = random.choice(untried_moves)
-#     new_state = copy.deepcopy(node.state)
-#     new_state['legal_moves'].remove(move)
-#     child = MCTS(new_state, parent=node, move=move)
-#     node.children.append(child)
-#     return child
-
-# def backpropagate(node, result):
-#     while node:
-#         node.visits += 1
-#         node.total_score += result
-#         node = node.parent
-
-# def monte_carlo_tree_search(initial_state, iterations=1000):
-#     root = MCTS(initial_state)
-
-#     for _ in range(iterations):
-#         node = root
-#         while node.is_fully_expanded() and node.children:
-#             node = node.best_child()
-#         leaf = expand(node)
-#         result = rollout(leaf.state)
-#         backpropagate(leaf, result)
-
-#     best = max(root.children, key=lambda c: c.visits)
-#     return best.move
-
-
