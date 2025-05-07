@@ -232,17 +232,21 @@ def dijkstra_search(node):
     # Dictionary to keep track of the highest score found for each node
     scores = {node: 0}
     
-    # Priority queue stores tuples of (-score, node)
+    # Use a counter to break ties and avoid comparing Node objects directly
+    counter = 0
+    
+    # Priority queue stores tuples of (-score, counter, node)
     # Using negative score because heapq is a min-heap but we want max score
-    pq = [(0, node)]
+    pq = [(0, counter, node)]
+    counter += 1
     
     # Set to keep track of processed nodes
     processed = set()
     
     while pq:
         # Get node with highest priority (highest score)
-        current_score, current_node = heapq.heappop(pq)
-        current_score = -current_score  # Convert back to positive score
+        current_neg_score, _, current_node = heapq.heappop(pq)
+        current_score = -current_neg_score  # Convert back to positive score
         
         # Skip if we've already processed this node
         if current_node in processed:
@@ -268,7 +272,8 @@ def dijkstra_search(node):
                 # If we found a better score to reach this node
                 if child_node not in scores or child_score > scores[child_node]:
                     scores[child_node] = child_score
-                    heapq.heappush(pq, (-child_score, child_node))
+                    heapq.heappush(pq, (-child_score, counter, child_node))
+                    counter += 1
     
     return best_move
 
