@@ -3,7 +3,12 @@ from player import Player
 import random
 from collections import deque
 import heapq
+<<<<<<< HEAD
 from simulation import Simulation
+=======
+import math
+import copy
+>>>>>>> 3a8fcb0aa0d74da3e7f6b15043cd65d6052fe7a4
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
@@ -59,8 +64,8 @@ class ScrabbleAI(Player):
         
         if not best_move:
             return None, "sk1p"
-        
         return best_move, "play"
+
     
     def get_best_move(self):
         """
@@ -94,112 +99,92 @@ class ScrabbleAI(Player):
             # Default to Monte Carlo Tree Search strategy
             return get_mcts_move(self.board, self.rack, self.dict)
     
-    def make_mcts_move(self, board, bag, players):
-        game = Simulation.deep_copy_game_state(board, bag, players)
-        return get_mcts_move(board, bag, players)
-        
-    
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
 
 def get_mcts_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
-    move_tree = create_word_tree(valid_moves, rack, False)
-    
-    mcts_search(board, rack, dict, 50, 1.0, move_tree) #or valid moves
-    
-def mcts_search(board, rack, dictionary, num_simulations, exploration_weight, moves):
-    """
-    Use Monte Carlo Tree Search to find the best move.
-    
-    Args:
-        board: The current ScrabbleBoard
-        rack: The current player's rack
-        dictionary: The DictionaryTrie object
-        num_simulations: Number of simulations to run
-        exploration_weight: Controls exploration vs exploitation
-        
-    Returns:
-        The best move found
-    """
-    # First, generate candidate moves
-    print(f"Running MCTS with {num_simulations} simulations...")
-    if not moves:
-        return None
-    # Create game state
-    game_state = {
-        'board': board,
-        'bag': get_current_bag(),  # You'll need to implement this
-        'players': get_players(),  # You'll need to implement this
-        'current_player': get_current_player()  # You'll need to implement this
-    }
-    
-    # Dictionary to store statistics for each move
-    move_stats = {move: {'wins': 0, 'plays': 0} for move in moves}
-    
-    # Run simulations
-    for _ in range(num_simulations):
-        # Select a move to explore
-        # Use UCB1 formula for selection
-        best_move = None
-        best_value = float('-inf')
-        
-        for move in candidate_moves:
-            stats = move_stats[move]
-            
-            # If move hasn't been played yet, prioritize it
-            if stats['plays'] == 0:
-                best_move = move
-                break
-                
-            # Calculate UCB1 value
-            exploitation = stats['wins'] / stats['plays']
-            exploration = exploration_weight * (2 * (total_plays := sum(s['plays'] for s in move_stats.values())) / stats['plays'])
-            ucb_value = exploitation + exploration
-            
-            if ucb_value > best_value:
-                best_value = ucb_value
-                best_move = move
-        
-        # Simulate the game after making this move
-        # Create a deep copy of the game state
-        sim_game_state = Simulation.deep_copy_game_state(game_state)
-        
-        # Make the move in the simulation
-        make_move_in_simulation(sim_game_state, best_move)
-        
-        # Play the game to completion and get the result
-        result = simulate_to_end(sim_game_state)
-        
-        # Update statistics
-        stats = move_stats[best_move]
-        stats['plays'] += 1
-        if result > 0:  # If the current player won
-            stats['wins'] += 1
-    
-    # Choose the move with the best win rate
-    best_move = max(candidate_moves, key=lambda move: move_stats[move]['wins'] / move_stats[move]['plays'] if move_stats[move]['plays'] > 0 else 0)
-    
-    return best_move
-
-def get_mcts_move(board, rack, dict): ## this looks like selecting 50 random moves and getting the best one ; random choice?
-    valid_moves = find_all_moves(board, rack, dict)
-    best_move = None
-
     if not valid_moves:
         return None
-    
-    # MCTS heuristic: sample moves randomly and pick the one with the highest score
-    best_score = -1
-    simulations = min(50, len(valid_moves))  # run up to 50 random simulations
 
-    for _ in range(simulations):
-        move = random.choice(valid_moves)
-        word, pos, dir, placed, score = move
-        if score > best_score:
-            best_score = score
-            best_move = [word, pos, dir]
+    # Set up root node
+    root_state = {
+        'board': board,
+        'rack': rack,
+        'legal_moves': valid_moves
+    }
+    root = Node(root_state)
+    iterations = 100  # or 500, or whatever number you want
 
-    return best_move
+
+    for _ in range(iterations):
+        node = root
+
+        # Selection phase
+        while node.is_fully_expanded() and node.children:
+            node = node.best_child()
+
+        # Expansion phase
+        leaf = expand(node)
+
+        # Simulation phase
+        result = rollout(leaf.state)
+
+        # Backpropagation phase
+        backpropagate(leaf, result)
+
+    # Choose best move from root's children
+    best_child = max(root.children, key=lambda c: c.visits)
+    move = best_child.move
+    return [move[0], move[1], move[2]]  # word, pos, direction
+
+class Node:
+    def __init__(self, state, parent=None, move=None):
+        self.state = state
+        self.parent = parent
+        self.move = move  # (word, pos, direction, placed, score)
+        self.children = []
+        self.visits = 0
+        self.total_score = 0
+
+    def is_fully_expanded(self):
+        return len(self.children) == len(self.state['legal_moves'])
+
+    def best_child(self, c_param=1.4):
+        return max(
+            self.children,
+            key=lambda c: (c.total_score / (c.visits + 1e-4)) + c_param * math.sqrt(math.log(self.visits + 1) / (c.visits + 1e-4))
+        )
+
+def expand(node):
+    tried_moves = [child.move for child in node.children]
+    untried_moves = [m for m in node.state['legal_moves'] if m not in tried_moves]
+    if not untried_moves:
+        return node
+
+    move = random.choice(untried_moves)
+    new_state = copy.deepcopy(node.state)
+    new_state['legal_moves'].remove(move)
+
+    child = Node(new_state, parent=node, move=move)
+    node.children.append(child)
+    return child
+
+def rollout(state):
+    legal_moves = state['legal_moves']
+    if not legal_moves:
+        return 0
+
+    move = random.choice(legal_moves)
+    _, _, _, _, score = move  # unpack score directly from the move tuple
+    return score
+
+def backpropagate(node, result):
+    while node:
+        node.visits += 1
+        node.total_score += result
+        node = node.parent
+        
+
     
 def get_bfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
@@ -1168,81 +1153,81 @@ def calculate_placement_score(placed_tiles, board, direction):
     
     return total_score
 
-def get_mcts_move(board, rack, dictionary, num_simulations=1000, exploration_weight=1.0):
-    """
-    Use Monte Carlo Tree Search to find the best move.
+# def get_mcts_move(board, rack, dictionary, num_simulations=1000, exploration_weight=1.0):
+#     """
+#     Use Monte Carlo Tree Search to find the best move.
     
-    Args:
-        board: The current ScrabbleBoard
-        rack: The current player's rack
-        dictionary: The DictionaryTrie object
-        num_simulations: Number of simulations to run
-        exploration_weight: Controls exploration vs exploitation
+#     Args:
+#         board: The current ScrabbleBoard
+#         rack: The current player's rack
+#         dictionary: The DictionaryTrie object
+#         num_simulations: Number of simulations to run
+#         exploration_weight: Controls exploration vs exploitation
         
-    Returns:
-        The best move found
-    """
-    # First, generate candidate moves
-    candidate_moves = find_all_moves(board, rack, dictionary)
+#     Returns:
+#         The best move found
+#     """
+#     # First, generate candidate moves
+#     candidate_moves = find_all_moves(board, rack, dictionary)
     
-    if not candidate_moves:
-        return None  # No valid moves
+#     if not candidate_moves:
+#         return None  # No valid moves
     
-    # Create game state
-    game_state = {
-        'board': board,
-        'bag': get_current_bag(),  # You'll need to implement this
-        'players': get_players(),  # You'll need to implement this
-        'current_player': get_current_player()  # You'll need to implement this
-    }
+#     # Create game state
+#     game_state = {
+#         'board': board,
+#         'bag': get_current_bag(),  # You'll need to implement this
+#         'players': get_players(),  # You'll need to implement this
+#         'current_player': get_current_player()  # You'll need to implement this
+#     }
     
-    # Dictionary to store statistics for each move
-    move_stats = {move: {'wins': 0, 'plays': 0} for move in candidate_moves}
+#     # Dictionary to store statistics for each move
+#     move_stats = {move: {'wins': 0, 'plays': 0} for move in candidate_moves}
     
-    # Run simulations
-    for _ in range(num_simulations):
-        # Select a move to explore
-        # Use UCB1 formula for selection
-        best_move = None
-        best_value = float('-inf')
+#     # Run simulations
+#     for _ in range(num_simulations):
+#         # Select a move to explore
+#         # Use UCB1 formula for selection
+#         best_move = None
+#         best_value = float('-inf')
         
-        for move in candidate_moves:
-            stats = move_stats[move]
+#         for move in candidate_moves:
+#             stats = move_stats[move]
             
-            # If move hasn't been played yet, prioritize it
-            if stats['plays'] == 0:
-                best_move = move
-                break
+#             # If move hasn't been played yet, prioritize it
+#             if stats['plays'] == 0:
+#                 best_move = move
+#                 break
                 
-            # Calculate UCB1 value
-            exploitation = stats['wins'] / stats['plays']
-            exploration = exploration_weight * (2 * (total_plays := sum(s['plays'] for s in move_stats.values())) / stats['plays'])
-            ucb_value = exploitation + exploration
+#             # Calculate UCB1 value
+#             exploitation = stats['wins'] / stats['plays']
+#             exploration = exploration_weight * (2 * (total_plays := sum(s['plays'] for s in move_stats.values())) / stats['plays'])
+#             ucb_value = exploitation + exploration
             
-            if ucb_value > best_value:
-                best_value = ucb_value
-                best_move = move
+#             if ucb_value > best_value:
+#                 best_value = ucb_value
+#                 best_move = move
         
-        # Simulate the game after making this move
-        # Create a deep copy of the game state
-        sim_game_state = Simulation.deep_copy_game_state(game_state)
+#         # Simulate the game after making this move
+#         # Create a deep copy of the game state
+#         sim_game_state = Simulation.deep_copy_game_state(game_state)
         
-        # Make the move in the simulation
-        make_move_in_simulation(sim_game_state, best_move)
+#         # Make the move in the simulation
+#         make_move_in_simulation(sim_game_state, best_move)
         
-        # Play the game to completion and get the result
-        result = simulate_to_end(sim_game_state)
+#         # Play the game to completion and get the result
+#         result = simulate_to_end(sim_game_state)
         
-        # Update statistics
-        stats = move_stats[best_move]
-        stats['plays'] += 1
-        if result > 0:  # If the current player won
-            stats['wins'] += 1
+#         # Update statistics
+#         stats = move_stats[best_move]
+#         stats['plays'] += 1
+#         if result > 0:  # If the current player won
+#             stats['wins'] += 1
     
-    # Choose the move with the best win rate
-    best_move = max(candidate_moves, key=lambda move: move_stats[move]['wins'] / move_stats[move]['plays'] if move_stats[move]['plays'] > 0 else 0)
+#     # Choose the move with the best win rate
+#     best_move = max(candidate_moves, key=lambda move: move_stats[move]['wins'] / move_stats[move]['plays'] if move_stats[move]['plays'] > 0 else 0)
     
-    return best_move
+#     return best_move
 
 # class MCTS:
 #     def __init__(self, state, parent=None, move=None):

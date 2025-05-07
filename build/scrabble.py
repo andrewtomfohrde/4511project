@@ -295,10 +295,18 @@ class Game:
             # Check if the player is an AI
             if isinstance(player, ScrabbleAI):
                 print(f"[{player.get_name()} is thinking...]")
+
+                best_move, action = player.make_move()
+
                 
                 # Get AI's move
+<<<<<<< HEAD
                 if player.get_name() == "AI_MCTS":
                     player.make_mcts_move(self.board, self.bag, self.players, self.dictionary)
+=======
+                if player.get_name() in ["AI_MCTS", "AI_BEAM"]:
+                    player.make_move()
+>>>>>>> 3a8fcb0aa0d74da3e7f6b15043cd65d6052fe7a4
                 else:
                     best_move, action = player.make_move()
                 
