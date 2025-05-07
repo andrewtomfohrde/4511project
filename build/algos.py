@@ -3,12 +3,8 @@ from player import Player
 import random
 from collections import deque
 import heapq
-<<<<<<< HEAD
-from simulation import Simulation
-=======
 import math
 import copy
->>>>>>> 3a8fcb0aa0d74da3e7f6b15043cd65d6052fe7a4
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
