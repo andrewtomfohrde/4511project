@@ -297,8 +297,8 @@ class Game:
                 print(f"[{player.get_name()} is thinking...]")
                 
                 # Get AI's move
-                if player.get_name() in ["AI_MCTS", "AI_BEAM"]:
-                    player.make_mcts_move(self)
+                if player.get_name() == "AI_MCTS":
+                    player.make_mcts_move(self.board, self.bag, self.players, self.dictionary)
                 else:
                     best_move, action = player.make_move()
                 
@@ -388,6 +388,8 @@ class Game:
             else:
                 next_player = self.players[0]
                 self.round_number += 1
+            player.set_curr(False)
+            next_player.set_curr(True)
 
             # Refill player's rack
             player.rack.replenish_rack()

@@ -1,17 +1,23 @@
 import copy
 from typing import List, Tuple, Dict, Optional
-from scrabble import ScrabbleBoard
-from player import Bag, Tile, Rack
+from scrabble import ScrabbleBoard, Game
+from player import Bag, Tile, Rack, Player
 import algos
 from word import Word
+from algos import ScrabbleAI
 
-class Simulation:
+class Simulation(Game):
+    def __init__(self, dict):
+        
+        self.board = None
+        self.players = []
+        self.bag = None
+        self.dict = dict
+    
     def deep_copy_board(board):
         new_board = ScrabbleBoard()
-        
         # Map from original nodes to new nodes for reference
         node_map = {}
-        
         # First pass: Create all nodes with their properties (except connections)
         original_node = board.start_node
         row = 0
@@ -69,22 +75,32 @@ class Simulation:
         """
         return copy.deepcopy(bag)
     
-    def deep_copy_player(player, new_board, new_bag):
+    def deep_copy_player(self, player, new_board, new_bag):
         """
         Create a deep copy of a Player object, connecting it to the new board and bag.
         """
+        # tiles_available = []
+        # tiles = player.get_rack_arr()
+        # for tile in tiles:
+        #     tiles_available = tiles_available + tile.get_letter()
+        
+        # for tile in new_bag.bag:
+        #     tiles_available = tiles_available + tile.get_letter()
+            
+        # print(tiles_available)
+        
         if isinstance(player, ScrabbleAI):
             # Create a new AI player
             new_player = ScrabbleAI(
-                dictionary=player.dict,  # Dictionary can be shared as it doesn't change
-                board=new_board,
-                bag=new_bag,
-                strategy=player.name.split('_')[1] if '_' in player.name else "MCTS"
+                player.dict,  # Dictionary can be shared as it doesn't change
+                new_board,
+                new_bag,
+                player.name.split('_')[1] if '_' in player.name else "MCTS"
             )
-        else:
-            # For regular players
-            new_player = Player(new_bag)
-            new_player.name = player.name
+        # else:
+        #     # For regular players
+        #     new_player = Player(new_bag)
+        #     new_player.name = player.name
         
         # Copy the rack
         new_player.rack = copy.deepcopy(player.rack)
@@ -95,7 +111,7 @@ class Simulation:
             
         return new_player
     
-    def deep_copy_game_state(game_state):
+    def deep_copy_game_state(self, board, bag, players, dict):
         """
         Create a deep copy of the entire game state.
         
@@ -106,27 +122,24 @@ class Simulation:
             A deep copy of the game state
         """
         # Copy the board
-        new_board = Simulation.deep_copy_board(game_state['board'])
-        
+        new_board = Simulation.deep_copy_board(board)
+        self.board = new_board
         # Copy the bag
-        new_bag = Simulation.deep_copy_bag(game_state['bag'])
-        
+        new_bag = Simulation.deep_copy_bag(bag)
+        self.bag = new_bag
         # Copy all players
         new_players = []
-        for player in game_state['players']:
+        for player in players:
             new_player = Simulation.deep_copy_player(player, new_board, new_bag)
             new_players.append(new_player)
-        
-        # Find the current player in the new list
-        current_player_index = game_state['players'].index(game_state['current_player'])
-        new_current_player = new_players[current_player_index]
-        
+        self.players = new_players
+    
         # Create the new game state
         new_game_state = {
             'board': new_board,
             'bag': new_bag,
             'players': new_players,
-            'current_player': new_current_player
+            'dict': dict
         }
         
         return new_game_state

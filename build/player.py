@@ -199,6 +199,10 @@ class Player:
         self.name = ""
         self.rack = Rack(bag)
         self.score = 0
+        self.curr = False
+        
+    def set_curr(self, bool):
+        self.curr = bool
 
     def set_name(self, name):
         #Sets the player's name.
