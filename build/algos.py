@@ -1,9 +1,6 @@
 from dictionarytrie import DictionaryTrie
 from player import Player
-from word import Word
-import math
 import random
-import copy
 from collections import deque
 import heapq
 
@@ -44,12 +41,10 @@ class ScrabbleAI(Player):
         self.set_strat(strategy)
 
     def set_strat(self, strat_name):
-        if strat_name in ["BEAM", "ASTAR", "GBFS", "BFS"]:
+        if strat_name in ["BEAM", "ASTAR", "GBFS", "BFS", "DFS", "UCS"]:
             self.name = f"AI_{strat_name}"
         else:
             self.name = "AI_MCTS"
-        
-        self.name = f"AI_{strat_name}"
 
     def get_name(self):
         #Gets the AIplayer's name.
@@ -71,24 +66,30 @@ class ScrabbleAI(Player):
         Get the best move based on the selected strategy.
         
         Returns:
-            The best move according to the selected strategy
+            The best move according t
+            the selected strategy
         """
         if self.name == "AI_GBFS":
             # Greedy best first search strategy
-            return get_gbfs_move()
+            # return get_gbfs_move(self.board, self.rack, self.dict)
+            return None
         elif self.name == "AI_ASTAR":
             # A* strategy
             return get_astar_move(self.board, self.rack, self.dict)
         elif self.name == "AI_BEAM":
             # Beam strategy
-            return get_beam_move(self.board, self.rack)
+            # return get_beam_move(self.board, self.rack, self.dict)
+            return None
         elif self.name == "AI_BFS":
             # BFS strategy
             return get_bfs_move(self.board, self.rack, self.dict)
         elif self.name == "AI_DFS":
             # dFS strategy
             return get_dfs_move(self.board, self.rack, self.dict)
-        else:
+        elif self.name == "AI_UCS":
+            # dFS strategy
+            return get_dijkstra_move(self.board, self.rack, self.dict)
+        else: # MCTS strategy
             # Default to Monte Carlo Tree Search strategy
             return get_mcts_move(self.board, self.rack, self.dict)
     
@@ -96,18 +97,15 @@ class ScrabbleAI(Player):
         """TO BE IMPLEMENTED"""
         return
     
-    
     ######### SCRABBLE AI ^^^ | vvv Global funcs below ####################################
 
-def get_mcts_move(board, rack, dict):
-    import random
-
+def get_mcts_move(board, rack, dict): ## this looks like selecting 50 random moves and getting the best one ; random choice?
     valid_moves = find_all_moves(board, rack, dict)
     best_move = None
 
     if not valid_moves:
         return None
-
+    
     # MCTS heuristic: sample moves randomly and pick the one with the highest score
     best_score = -1
     simulations = min(50, len(valid_moves))  # run up to 50 random simulations
@@ -120,9 +118,6 @@ def get_mcts_move(board, rack, dict):
             best_move = [word, pos, dir]
 
     return best_move
-
-
-
     
 def get_bfs_move(board, rack, dict):
     valid_moves = find_all_moves(board, rack, dict)
@@ -212,9 +207,72 @@ def astar_search(node):
     
     return best_move
     
+def get_dijkstra_move(board, rack, dict): ## same thing as Uniform Cost Search (UCS)
+    valid_moves = find_all_moves(board, rack, dict)
+    move_tree = create_word_tree(valid_moves, rack, True)  # Include scores in the tree
+
+    return dijkstra_search(move_tree.root)
+
+def dijkstra_search(node):
+    """
+    Implementation of Dijkstra's algorithm for finding the optimal move in Scrabble.
+    
+    In this context, Dijkstra is used to find the move with the highest score,
+    treating lower scores as "longer distances".
+    
+    Args:
+        node: The root node of the move tree
+        
+    Returns:
+        The best move [word, position, direction]
+    """
+    best_move = None
+    best_score = -1
+    
+    # Dictionary to keep track of the highest score found for each node
+    scores = {node: 0}
+    
+    # Priority queue stores tuples of (-score, node)
+    # Using negative score because heapq is a min-heap but we want max score
+    pq = [(0, node)]
+    
+    # Set to keep track of processed nodes
+    processed = set()
+    
+    while pq:
+        # Get node with highest priority (highest score)
+        current_score, current_node = heapq.heappop(pq)
+        current_score = -current_score  # Convert back to positive score
+        
+        # Skip if we've already processed this node
+        if current_node in processed:
+            continue
+            
+        processed.add(current_node)
+        
+        # Check if this is a terminal node with a valid move
+        if hasattr(current_node, 'is_terminal') and current_node.is_terminal:
+            if hasattr(current_node, 'score') and current_node.score > best_score:
+                best_score = current_node.score
+                best_move = [current_node.word, current_node.position, current_node.direction]
+        
+        # Process all neighbors (children)
+        for child_node in current_node.children.values():
+            if child_node not in processed:
+                # Calculate the score for this path
+                # In Dijkstra, we're looking for highest score, not lowest distance
+                child_score = current_score
+                if hasattr(child_node, 'score'):
+                    child_score += child_node.score
+                
+                # If we found a better score to reach this node
+                if child_node not in scores or child_score > scores[child_node]:
+                    scores[child_node] = child_score
+                    heapq.heappush(pq, (-child_score, child_node))
+    
+    return best_move
 
 def get_beam_move(board, rack):
-
     if not rack or not board:
         return None, ""
     
@@ -289,18 +347,15 @@ def rack_score(placed, rack): # used in astar search
 def beam_search(move_tree, beam_width=10):
     """
     Perform beam search on the word tree to find the best move.
-    
     The beam search algorithm works by:
     1. Starting at the root of the tree
     2. Evaluating all child nodes
     3. Keeping only the top N (beam_width) candidates
     4. Continuing this process until leaf nodes are reached
     5. Returning the highest scoring move found
-    
     Args:
         move_tree: DictionaryTrie containing moves
         beam_width: Number of candidates to keep at each level
-        
     Returns:
         dict: Best move information or None if no moves found
     """
@@ -370,11 +425,15 @@ def candidate_score(node):
         secondary_score += len(node.word) * 10
     
     return (score, secondary_score)
+
+def simulateGame():
+    return None
     
 def find_anchor_points(board):
-
-    """Find all empty cells adjacent to placed tiles."""
-    """Returns a set of anchor locations (row, col) on board"""
+    """
+    Find all empty cells adjacent to placed tiles.
+    Returns a set of anchor locations (row, col) on board
+    """
     anchor_points = set()
     current_node = board.start_node
     
@@ -404,13 +463,11 @@ def get_cross_checks(board, dict, row, col, direction):
     """
     Calculate which letters can be legally placed at a position based on
     cross-checks (words formed in the perpendicular direction).
-    
     Args:
         board: The game board
         dict: Dictionary of valid words
         row, col: Position to check
         direction: 'right' for horizontal words, 'down' for vertical words
-    
     Returns:
         Set of valid letters that can be placed at this position
     """
@@ -544,7 +601,6 @@ def get_cross_checks(board, dict, row, col, direction):
 def find_all_moves(board, rack, dict):
     """
     Find all valid moves for the current board and rack.
-    
     Returns:
         List of valid moves with scores
     """
@@ -571,7 +627,6 @@ def find_all_moves(board, rack, dict):
 def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
     """
     Find all valid moves that go through a specific anchor point in a given direction.
-   
     Args:
         dict: The dictionary containing valid words
         board: The current game board
@@ -588,7 +643,6 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
     
     # Find the maximum prefix length (how far we can go before the anchor)
     prefix_limit = calculate_prefix_limit(board, anchor_row, anchor_col, direction)
-   
     # Try each possible prefix length
     for prefix_length in range(prefix_limit + 1):
         # Calculate the starting position for this prefix length
@@ -623,7 +677,6 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
                     i += 1
                 else:
                     break
-       
         # Find all words that can be placed starting at this position
         dict_node = dict.root
         # Process any existing prefix letters to get the right dictionary node
@@ -658,11 +711,9 @@ def find_moves_at_anchor(dict, board, anchor_row, anchor_col, rack, direction):
 def calculate_prefix_limit(board, row, col, direction):
     """
     Calculate the maximum number of tiles that can be placed before an anchor point.
-    
     Args:
         row, col: The anchor position
         direction: 'right' or 'down'
-    
     Returns:
         Maximum number of tiles that can be placed before the anchor
     """
@@ -695,7 +746,6 @@ def generate_moves_recursive(partial_word, dictionary, dict_node, row, col, boar
                           direction, remaining_prefix, placed_tiles, word_has_anchor, valid_moves):
     """
     Recursively generate all valid moves starting from a position.
-    
     Args: 
         partial_word: Word built so far
         dictionary: The dictionary trie
@@ -819,7 +869,9 @@ def generate_moves_recursive(partial_word, dictionary, dict_node, row, col, boar
             record_move(partial_word, placed_tiles, direction, valid_moves, board)    
 
 def get_next_position(row, col, direction):
-    """Get the next position based on the current direction."""
+    """
+    Get the next position based on the current direction.
+    """
     if direction == "right":
         return row, col + 1
     else:  # direction == 'down'
@@ -828,7 +880,6 @@ def get_next_position(row, col, direction):
 def record_move(word, placed_tiles, direction, valid_moves, board):
     """
     Record a valid move in the list of valid moves.
-    
     Args:
         word: The word formed
         placed_tiles: List of tiles placed [(position, letter)]
@@ -861,10 +912,8 @@ def record_move(word, placed_tiles, direction, valid_moves, board):
 def calculate_placement_score(placed_tiles, board, direction):
     """
     Calculate the score for a set of placed tiles.
-    
     Args:
         placed_tiles: List of tiles placed [(position, letter)]
-        
     Returns:
         Total score for this placement
     """
@@ -953,6 +1002,82 @@ def calculate_placement_score(placed_tiles, board, direction):
         total_score += 50
     
     return total_score
+
+def get_mcts_move(board, rack, dictionary, num_simulations=1000, exploration_weight=1.0):
+    """
+    Use Monte Carlo Tree Search to find the best move.
+    
+    Args:
+        board: The current ScrabbleBoard
+        rack: The current player's rack
+        dictionary: The DictionaryTrie object
+        num_simulations: Number of simulations to run
+        exploration_weight: Controls exploration vs exploitation
+        
+    Returns:
+        The best move found
+    """
+    # First, generate candidate moves
+    candidate_moves = find_all_moves(board, rack, dictionary)
+    
+    if not candidate_moves:
+        return None  # No valid moves
+    
+    # Create game state
+    game_state = {
+        'board': board,
+        'bag': get_current_bag(),  # You'll need to implement this
+        'players': get_players(),  # You'll need to implement this
+        'current_player': get_current_player()  # You'll need to implement this
+    }
+    
+    # Dictionary to store statistics for each move
+    move_stats = {move: {'wins': 0, 'plays': 0} for move in candidate_moves}
+    
+    # Run simulations
+    for _ in range(num_simulations):
+        # Select a move to explore
+        # Use UCB1 formula for selection
+        best_move = None
+        best_value = float('-inf')
+        
+        for move in candidate_moves:
+            stats = move_stats[move]
+            
+            # If move hasn't been played yet, prioritize it
+            if stats['plays'] == 0:
+                best_move = move
+                break
+                
+            # Calculate UCB1 value
+            exploitation = stats['wins'] / stats['plays']
+            exploration = exploration_weight * (2 * (total_plays := sum(s['plays'] for s in move_stats.values())) / stats['plays'])
+            ucb_value = exploitation + exploration
+            
+            if ucb_value > best_value:
+                best_value = ucb_value
+                best_move = move
+        
+        # Simulate the game after making this move
+        # Create a deep copy of the game state
+        sim_game_state = Simulation.deep_copy_game_state(game_state)
+        
+        # Make the move in the simulation
+        make_move_in_simulation(sim_game_state, best_move)
+        
+        # Play the game to completion and get the result
+        result = simulate_to_end(sim_game_state)
+        
+        # Update statistics
+        stats = move_stats[best_move]
+        stats['plays'] += 1
+        if result > 0:  # If the current player won
+            stats['wins'] += 1
+    
+    # Choose the move with the best win rate
+    best_move = max(candidate_moves, key=lambda move: move_stats[move]['wins'] / move_stats[move]['plays'] if move_stats[move]['plays'] > 0 else 0)
+    
+    return best_move
 
 # class MCTS:
 #     def __init__(self, state, parent=None, move=None):

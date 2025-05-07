@@ -37,7 +37,7 @@ LETTER_VALUES = {"A": 1,
                  "X": 8,
                  "Y": 4,
                  "Z": 10,
-                 "#": 2}
+                 "#": 0}
 
 class ScrabbleBoard:
     class BoardNode(object):
@@ -172,7 +172,6 @@ class ScrabbleBoard:
         direction = direction.lower()
         word = word.upper()
         used_tiles = []
-        placed = False
         
         start_row, start_col = location
         
@@ -199,15 +198,13 @@ class ScrabbleBoard:
             
             if node is not None and node.tile is not None:
                 print("Tile already placed in previous move\n")
-                placed = False
                 
             else:
-                placed = True
                 for tile in player.rack.get_rack_arr():
                     # For blank tiles, look for '#'
                     if is_blank and tile.get_letter() == '#':
                         used_tile = tile
-                        node.place_blank(used_tile, letter)
+                        node.place_blank(used_tile, placed_tiles[i][1])
                         print(f"Placing tile # as {placed_tiles[i][1]}")
                         break
                     # For regular tiles, look for matching letter
@@ -224,13 +221,23 @@ class ScrabbleBoard:
                             if tile.get_letter() == '#':
                                 used_tile = tile
                                 is_blank = True
-                                print(f"Using {used_tile.get_letter()} to fill '{letter}' in for your play.")
-                                node.place_blank(used_tile, letter)
+                                print(f"Using {used_tile.get_letter()} to fill in gaps of your play.")
                                 break
-            if placed:
-                print(f"Removing {tile.get_letter()} from rack")
-                player.rack.remove_from_rack(tile)
             
+            if used_tile:
+                used_tiles.append(used_tile)
+                
+                # Place the tile on the board
+                #(used_tile, letter)        
+        
+        # # Apply word multiplier
+        # total_score *= word_multiplier
+        
+        # Remove used tiles from rack
+        for tile in used_tiles:
+            print(f"Removing {tile.get_letter()} from rack")
+            player.rack.remove_from_rack(tile)
+        
         # Replenish rack
         player.rack.replenish_rack()
 
@@ -259,23 +266,30 @@ class ScrabbleBoard:
 
 
 class Game:
-    def __init__(self, dict):
+    def __init__(self):
         self.round_number = 1
         self.players = []
         self.skipped_turns = 0
-        self.dictionary = dict
+        self.board = ScrabbleBoard()
+        self.bag = Bag()
+        self.init_dict()
 
     def add_player(self, player):
         """Add a player to the game"""
         self.players.append(player)
 
-    def turn(self, player, board, bag):
+    def init_dict(self):
+        dict_file_path = "build/scrabbledict.txt"
+        dict = load_dictionary_from_file(dict_file_path)
+        self.dictionary = dict
+
+    def turn(self, player):
         """
         Handle a player's turn
         """
-        if (self.skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
+        if (self.skipped_turns < 6) or (player.rack.get_rack_length() == 0 and self.bag.get_remaining_tiles() == 0):
             print(f"\nRound {self.round_number}: {player.get_name()}'s turn \n")
-            print(board.get_board())
+            print(self.board.get_board())
             print(f"\n{player.get_name()}'s Letter Rack: {player.get_rack_str()}")
 
             # Check if the player is an AI
@@ -283,7 +297,10 @@ class Game:
                 print(f"[{player.get_name()} is thinking...]")
                 
                 # Get AI's move
-                best_move, action = player.make_move()
+                if player.get_name() in ["AI_MCTS", "AI_BEAM"]:
+                    player.make_mcts_move(self)
+                else:
+                    best_move, action = player.make_move()
                 
                 if action == "sk1p" and not best_move:
                     print(f"{player.get_name()} has no valid moves. Skipping turn.")
@@ -296,11 +313,11 @@ class Game:
                     print(f"{player.get_name()} plays: {word_to_play} at {location} going {direction}")
                     
                     # Create and validate the word
-                    word = Word(word_to_play, location, player, direction, board)
+                    word = Word(word_to_play, location, player, direction, self.board)
                     valid, placed = word.check_word()
                     
                     if valid:
-                        board.place_word(word_to_play, location, direction, player, placed)
+                        self.board.place_word(word_to_play, location, direction, player, placed)
                         word_score = word.calculate_word_score(placed)
                         print(f"Word '{word.word}' placed for {word_score} points!")
                         player.increase_score(word_score)
@@ -308,8 +325,8 @@ class Game:
                     else:
                         print(f"{player.get_name()} attempted invalid word. Skipping.")
                         self.skipped_turns += 1
-                print(f"\n{player.get_name()}'s Letter Rack: {player.get_rack_str()}")
 
+                input("Continue? :")
             
             # Human player's turn
             else:
@@ -334,7 +351,7 @@ class Game:
                         location = [int(row), int(col)]
                     direction = input("Direction of word (right or down): ")
 
-                    word = Word(word_to_play, location, player, direction, board)
+                    word = Word(word_to_play, location, player, direction, self.board)
 
                     # Handle blank tiles
                     blank_positions = [m.start() for m in re.finditer('#', word_to_play)]
@@ -350,10 +367,10 @@ class Game:
                         new_word = ''.join(modified_word)
                         word.set_word(new_word)
 
-                    checked, placed = word.check_word()
+                    checked, placed = word.chdicteck_word()
                 
                 if checked and not word_to_play.lower() in "":
-                    success = board.place_word(word_to_play, location, direction, player, placed)
+                    success = self.board.place_word(word_to_play, location, direction, player, placed)
                     word_score = word.calculate_word_score(placed)
                     if success:
                         print(f"Word '{word.word}' placed for {word_score} points!")
@@ -376,58 +393,48 @@ class Game:
             player.rack.replenish_rack()
             
             # Recursive call for next player's turn
-            self.turn(next_player, board, bag)
+            self.turn(next_player)
         else:
-            print(board.get_board())
             self.end_game()
 
     def start_game(self):
         """Start a game with human players only"""
-        board = ScrabbleBoard()
-        bag = Bag()
-        
         # Create players
         num_players = int(input("Enter number of players (2-4): "))
         for i in range(min(num_players, 4)):
-            player = Player(bag)
+            player = Player(self.bag)
             player.set_name(input(f"Enter name for player {i+1}: "))
             self.add_player(player)
         
         # Start the game with the first player
-        self.turn(self.players[0], board, bag)
+        self.turn(self.players[0])
 
     def start_game_vs_ai(self):
         """Start a game with one human player and one AI player"""
-        board = ScrabbleBoard()
-        bag = Bag()
-        
         # Create human player
-        human = Player(bag)
+        human = Player(self.bag)
         human.set_name(input("Enter your name: "))
         self.add_player(human)
         
         # Create AI player
-        ai_strategy = input("Select AI strategy (MCTS/BEAM/ASTAR/GBFS/BFS/DFS): ").upper()
-        ai = ScrabbleAI(self.dictionary, board, bag, ai_strategy)
+        ai_strategy = input("Select AI strategy (MCTS/BEAM/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
+        ai = ScrabbleAI(self.dictionary, self.board, self.bag, ai_strategy)
         self.add_player(ai)
         
         # Start the game with the human player
-        self.turn(self.players[0], board, bag)
+        self.turn(self.players[0])
 
     def start_ai_game(self):
         """Start a game with AI players only"""
-        board = ScrabbleBoard()
-        bag = Bag()
-        
         # Create AI players
         num_ais = int(input("Enter number of AI players (2-4): "))
         for i in range(min(num_ais, 4)):
-            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/BEAM/ASTAR/GBFS/BFS/DFS): ").upper()
-            ai = ScrabbleAI(self.dictionary, board, bag, ai_strategy)
+            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
+            ai = ScrabbleAI(self.dictionary, self.board, self.bag, ai_strategy)
             self.add_player(ai)
         
         # Start the game with the first AI
-        self.turn(self.players[0], board, bag)
+        self.turn(self.players[0])
 
     def end_game(self):
         """Forces the game to end when the bag runs out of tiles or too many skipped turns."""
@@ -461,10 +468,7 @@ class Game:
                 print(f"{player_name} ended the game with {score} points!")
 
 def main():
-    dict_file_path = "build/scrabbledict.txt"
-    dictionary = load_dictionary_from_file(dict_file_path)
-    
-    game = Game(dictionary)
+    game = Game()
     
     print("Welcome to Scrabble!")
     game_type = input("Select game type:\n1. Human vs Human\n2. Human vs AI\n3. AI vs AI\nChoice: ")
