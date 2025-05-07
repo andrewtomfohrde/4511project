@@ -222,6 +222,7 @@ class ScrabbleBoard:
                                 used_tile = tile
                                 is_blank = True
                                 print(f"Using {used_tile.get_letter()} to fill in gaps of your play.")
+                                node.place_blank(used_tile, placed_tiles[i][1])
                                 break
             
             if used_tile:
@@ -261,6 +262,60 @@ class ScrabbleBoard:
         
         return current
 
+    def deep_copy_board(board):
+        new_board = ScrabbleBoard()
+        # Map from original nodes to new nodes for reference
+        node_map = {}
+        # First pass: Create all nodes with their properties (except connections)
+        original_node = board.start_node
+        row = 0
+        while original_node:
+            col_node = original_node
+            col = 0
+            while col_node:
+                # Find the corresponding new node
+                new_node = _get_node_at_position(new_board.start_node, (row, col))
+                
+                # Copy properties
+                if col_node.tile:
+                    new_node.tile = copy.deepcopy(col_node.tile)
+                new_node.score_multiplier = col_node.score_multiplier
+                
+                # Add to map
+                node_map[col_node] = new_node
+                
+                # Move to next column
+                col_node = col_node.right
+                col += 1
+                
+            # Move to next row
+            original_node = original_node.down
+            row += 1
+            
+        return new_board
+    
+    def _get_node_at_position(start_node, position):
+        """
+        Get the node at a specific position starting from the top-left node.
+        """
+        row, col = position
+        current = start_node
+        
+        # Move down to the correct row
+        for _ in range(row):
+            if current.down:
+                current = current.down
+            else:
+                return None
+        
+        # Move right to the correct column
+        for _ in range(col):
+            if current.right:
+                current = current.right
+            else:
+                return None
+        
+        return current
 
 ##############################################################################3###
 
@@ -370,7 +425,7 @@ class Game:
                         new_word = ''.join(modified_word)
                         word.set_word(new_word)
 
-                    checked, placed = word.chdicteck_word()
+                    checked, placed = word.check_word()
                 
                 if checked and not word_to_play.lower() in "":
                     success = self.board.place_word(word_to_play, location, direction, player, placed)
@@ -407,7 +462,7 @@ class Game:
         # Create players
         num_players = int(input("Enter number of players (2-4): "))
         for i in range(min(num_players, 4)):
-            player = Player(self.bag)
+            player = Player(self.bag, self.dictionary, self.board)
             player.set_name(input(f"Enter name for player {i+1}: "))
             self.add_player(player)
         
@@ -417,13 +472,13 @@ class Game:
     def start_game_vs_ai(self):
         """Start a game with one human player and one AI player"""
         # Create human player
-        human = Player(self.bag)
+        human = Player(self.bag, self.dictionary, self.board)
         human.set_name(input("Enter your name: "))
         self.add_player(human)
         
         # Create AI player
         ai_strategy = input("Select AI strategy (MCTS/BEAM/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
-        ai = ScrabbleAI(self.dictionary, self.board, self.bag, ai_strategy)
+        ai = ScrabbleAI(self.bag, self.dictionary, self.board, ai_strategy)
         self.add_player(ai)
         
         # Start the game with the human player
@@ -435,7 +490,7 @@ class Game:
         num_ais = int(input("Enter number of AI players (2-4): "))
         for i in range(min(num_ais, 4)):
             ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
-            ai = ScrabbleAI(self.dictionary, self.board, self.bag, ai_strategy)
+            ai = ScrabbleAI(self.bag, self.dictionary, self.board, ai_strategy)
             self.add_player(ai)
         
         # Start the game with the first AI

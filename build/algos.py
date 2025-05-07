@@ -36,10 +36,8 @@ LETTER_VALUES = {"A": 1,
                  "#": 0}
 
 class ScrabbleAI(Player):
-    def __init__(self, dictionary, board, bag, strategy):
-        super().__init__(bag)  # Initialize the Player attributes
-        self.dict = dictionary
-        self.board = board
+    def __init__(self, bag, dictionary, board, strategy):
+        super().__init__(bag, dictionary, board)  # Initialize the Player attributes
         self.set_strat(strategy)
 
     def set_strat(self, strat_name):
@@ -62,6 +60,34 @@ class ScrabbleAI(Player):
             return None, "sk1p"
         return best_move, "play"
 
+    def deep_copy_player(self, player, new_board, new_bag):
+        """
+        Create a deep copy of a Player object, connecting it to the new board and bag.
+        """
+        if isinstance(player, ScrabbleAI):
+            # Create a new AI player
+            new_player = ScrabbleAI(
+                player.dict,  # Dictionary can be shared as it doesn't change
+                new_board,
+                new_bag,
+                player.name.split('_')[1] if '_' in player.name else "MCTS"
+            )
+        else:
+            new_player = Player(
+                player.dict,  # Dictionary can be shared as it doesn't change
+                new_board,
+                new_bag,
+                player.name.split('_')[1] if '_' in player.name else "MCTS"
+            )
+       
+        # Copy the rack
+        new_player.rack = copy.deepcopy(player.rack)
+       
+        # Copy score
+        if hasattr(player, 'score'):
+            new_player.score = player.score
+           
+        return new_player
     
     def get_best_move(self):
         """
@@ -81,7 +107,7 @@ class ScrabbleAI(Player):
         elif self.name == "AI_BEAM":
             # Beam strategy
             # return get_beam_move(self.board, self.rack, self.dict)
-            return None
+            return get_beam_move(self.board, self.rack, self, self.rack.bag, self.dict, 5, 3)
         elif self.name == "AI_BFS":
             # BFS strategy
             return get_bfs_move(self.board, self.rack, self.dict)
@@ -348,17 +374,102 @@ def dijkstra_search(node):
 
 ###
 
-def get_beam_move(board, rack):
-    if not rack or not board:
-        return None, ""
+def get_beam_move(board, rack, player, bag, dict, beam_width=5, search_depth=3):
+    """
+    Find the best move using beam search.
     
-    valid_moves = find_all_moves(board, rack)
+    Args:
+        board: Current game board
+        rack: Current player's letter rack
+        dict: Dictionary of valid words
+        beam_width: Number of top states to keep at each level
+        search_depth: How many moves to look ahead
+        
+    Returns:
+        Best move as [word, position, direction]
+    """
+    # Get all valid moves from the current state
+    valid_moves = find_all_moves(board, rack, dict)
     if not valid_moves:
-        return None, ""
-    move_tree = create_word_tree(valid_moves, rack)
-
-    best_move = beam_search(move_tree, 10)
-    return best_move
+        return None
+        
+    # Initial beam contains just the starting state
+    initial_state = {
+        'board': board,
+        'player': player,
+        'bag': bag,
+        'score': 0,
+        'moves_made': [],
+        'cumulative_score': 0
+    }
+    
+    # Use a list of states as our beam
+    current_beam = [initial_state]
+    
+    # For each depth level
+    for depth in range(search_depth):
+        next_beam = []
+        
+        # Expand each state in the current beam
+        for state in current_beam:
+            # Generate all possible next moves from this state
+            current_board = state['board']
+            current_player = state['player']
+            current_bag = state['bag']
+            
+            # Get valid moves from this state
+            moves = find_all_moves(current_board, current_player.rack, dict)
+            if not moves:
+                # If no moves possible, keep this state in the beam
+                next_beam.append(state)
+                continue
+                
+            # For each move, create a new state
+            for move in moves:
+                word, position, direction, placed_tiles, move_score = move
+                
+                # Create a copy of the current state
+                new_state = copy.deepcopy(state)
+                
+                # Apply the move
+                new_board = deep_copy_board(current_board)
+                new_bag = deep_copy_bag(current_bag)
+                new_player = deep_copy_player(current_player, new_board, new_bag)
+                
+                # Update the state
+                apply_move_to_board(new_board, word, position, direction, placed_tiles)
+                
+                # Update the player's rack and score
+                update_player_after_move(new_player, new_bag, placed_tiles, move_score)
+                
+                # Create a new state
+                new_state = {
+                    'board': new_board,
+                    'player': new_player,
+                    'bag': new_bag,
+                    'score': move_score,
+                    'moves_made': state['moves_made'] + [move],
+                    'cumulative_score': state['cumulative_score'] + move_score
+                }
+                
+                # Add to candidates for next beam
+                next_beam.append(new_state)
+        
+        # Keep only the top beam_width states based on cumulative score
+        current_beam = heapq.nlargest(beam_width, next_beam, 
+                                      key=lambda s: s['cumulative_score'])
+        
+    if not current_beam:
+        return None
+        
+    best_state = max(current_beam, key=lambda s: s['cumulative_score'])
+    
+    # Return the first move from the best path
+    if best_state['moves_made']:
+        first_move = best_state['moves_made'][0]
+        return [first_move[0], first_move[1], first_move[2]]  # word, pos, direction
+    
+    return None
 
     
 def create_word_tree(moves, rack, h):
@@ -1076,3 +1187,45 @@ def calculate_placement_score(placed_tiles, board, direction):
         total_score += 50
     
     return total_score
+
+def deep_copy_bag(bag):
+    """
+    Create a deep copy of the Bag object.
+    """
+    return copy.deepcopy(bag)
+
+def deep_copy_player(player, new_board, new_bag):
+    """
+    Create a deep copy of a Player object, connecting it to the new board and bag.
+    """
+    # tiles_available = []
+    # tiles = player.get_rack_arr()
+    # for tile in tiles:
+    #     tiles_available = tiles_available + tile.get_letter()
+    
+    # for tile in new_bag.bag:
+    #     tiles_available = tiles_available + tile.get_letter()
+        
+    # print(tiles_available)
+    
+    if isinstance(player, ScrabbleAI):
+        # Create a new AI player
+        new_player = ScrabbleAI(
+            player.dict,  # Dictionary can be shared as it doesn't change
+            new_board,
+            new_bag,
+            player.name.split('_')[1] if '_' in player.name else "MCTS"
+        )
+    # else:
+    #     # For regular players
+    #     new_player = Player(new_bag)
+    #     new_player.name = player.name
+    
+    # Copy the rack
+    new_player.rack = copy.deepcopy(player.rack)
+    
+    # Copy score
+    if hasattr(player, 'score'):
+        new_player.score = player.score
+        
+    return new_player

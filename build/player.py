@@ -1,4 +1,5 @@
 from random import shuffle
+import copy
 
 global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
@@ -58,11 +59,12 @@ class Tile:
         #Returns the tile's actual letter
         return self.letter
     
-    def copy(self):
+    def deep_copy_tile(self):
         """
-        Creates a deep copy of the rack for move simulation without modifying the original.
-        Returns a new Rack instance with the same tiles.
+        Create a deep copy of a Tile object.
         """
+        if self is None:
+            return None
         return Tile(self.letter, LETTER_VALUES)
     
 class Bag:
@@ -119,6 +121,23 @@ class Bag:
     def get_remaining_tiles(self):
         #Returns the number of tiles left in the bag.
         return len(self.bag)
+    
+    def deep_copy_bag(bag):
+        """
+        Create a deep copy of the Bag object.
+        This explicitly creates a new Bag instance and copies each tile individually.
+        """
+        new_bag = Bag()
+        # Clear the automatically generated tiles from initialization
+        new_bag.bag = []
+        
+        # Copy each tile in the original bag
+        for tile in bag.bag:
+            # Create a new tile with the same properties
+            new_tile = Tile(tile.letter, LETTER_VALUES)
+            new_bag.bag.append(new_tile)
+            
+        return new_bag
     
 class Rack:
     """
@@ -193,10 +212,12 @@ class Player:
     """
     Creates an instance of a player. Initializes the player's rack, and allows you to set/get a player name.
     """
-    def __init__(self, bag):
+    def __init__(self, bag, dictionary, board):
         #Intializes a player instance. Creates the player's rack by creating an instance of that class.
         #Takes the bag as an argument, in order to create the rack.
         self.name = ""
+        self.dict = dictionary
+        self.board = board
         self.rack = Rack(bag)
         self.score = 0
         self.curr = False
@@ -232,3 +253,4 @@ class Player:
         for tile in self.get_rack_arr():
             self.score -= tile.get_score()
         return self.score
+    
