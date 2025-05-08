@@ -1,15 +1,17 @@
 from random import shuffle
+import re
+from dictionarytrie import DictionaryTrie
+from word import Word, load_dictionary_from_file
+from algos import ScrabbleAI
+from player import Tile, Bag, Rack, Player
+import copy
 
-"""
-Scrabble Game
-Classes:
-Tile - keeps track of the tile letter and value
-Rack - keeps track of the tiles in a player's letter rack
-Bag - keeps track of the remaining tiles in the bag
-Word - checks the validity of a word and its placement
-Board - keeps track of the tiles' location on the board
-"""
-#Keeps track of the score-worth of each letter-tile.
+# from mcts_scrabble import monte_carlo_tree_search
+# mcts_scrabble.py
+# from scrabble import Word
+
+
+global LETTER_VALUES
 LETTER_VALUES = {"A": 1,
                  "B": 3,
                  "C": 3,
@@ -38,456 +40,536 @@ LETTER_VALUES = {"A": 1,
                  "Z": 10,
                  "#": 0}
 
-class Tile:
+class ScrabbleBoard:
+    class BoardNode(object):
+        """
+        A node in the linked list representation of the Scrabble board.
+        Each node represents a single cell on the board.
+        """
+        def __init__(self):
+            self.tile = None
+            self.right = None
+            self.down = None
+            self.left = None
+            self.up = None
+            self.position = (0, 0) # (row, column)
+            self.score_multiplier = ""
+            # TRIPLE_WORD_SCORE = ((0,0), (7, 0), (14,0), (0, 7), (14, 7), (0, 14), (7, 14), (14,14))
+            # DOUBLE_WORD_SCORE = ((1,1), (2,2), (3,3), (4,4), (1, 13), (2, 12), (3, 11), (4, 10), (7, 7), (13, 1), (12, 2), (11, 3), (10, 4), (13,13), (12, 12), (11,11), (10,10))
+            # TRIPLE_LETTER_SCORE = ((1,5), (1, 9), (5,1), (5,5), (5,9), (5,13), (9,1), (9,5), (9,9), (9,13), (13, 5), (13,9))
+            # DOUBLE_LETTER_SCORE = ((0, 3), (0,11), (2,6), (2,8), (3,0), (3,7), (3,14), (6,2), (6,6), (6,8), (6,12), (7,3), (7,11), (8,2), (8,6), (8,8), (8, 12), (11,0), (11,7), (11,14), (12,6), (12,8), (14, 3), (14, 11))
+            
+        
+        def place_tile(self, tile):
+            self.tile = tile
+            
+        def place_blank(self, tile, char):
+            self.tile = tile
+            self.tile.char = char
+            
+        def get_display_str(self):
+            """Return a string representation of this cell."""
+            if self.tile:
+                return f"{self.tile.char}/{self.tile.letter}"
+            elif self.position == (7, 7):  # Center square
+                return " * "
+            elif self.score_multiplier:
+                return self.score_multiplier
+            else:
+                return "   "
     """
-    Class that allows for the creation of a tile. Initializes using an uppercase string of one letter,
-    and an integer representing that letter's score.
-    """
-    def __init__(self, letter, letter_values):
-        #Initializes the tile class. Takes the letter as a string, and the dictionary of letter values as arguments.
-        self.letter = letter.upper()
-        if self.letter in letter_values:
-            self.score = letter_values[self.letter]
-        else:
-            self.score = 0
-
-    def get_letter(self):
-        #Returns the tile's letter (string).
-        return self.letter
-
-    def get_score(self):
-        #Returns the tile's score value.
-        return self.score
-
-class Bag:
-    """
-    Creates the bag of all tiles that will be available during the game. Contains 98 letters and two blank tiles.
-    Takes no arguments to initialize.
-    """
-    def __init__(self):
-        #Creates the bag full of game tiles, and calls the initialize_bag() method, which adds the default 100 tiles to the bag.
-        #Takes no arguments.
-        self.bag = []
-        self.initialize_bag()
-
-    def add_to_bag(self, tile, quantity):
-        #Adds a certain quantity of a certain tile to the bag. Takes a tile and an integer quantity as arguments.
-        for i in range(quantity):
-            self.bag.append(tile)
-
-    def initialize_bag(self):
-        #Adds the intiial 100 tiles to the bag.
-        global LETTER_VALUES
-        self.add_to_bag(Tile("A", LETTER_VALUES), 9)
-        self.add_to_bag(Tile("B", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("C", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("D", LETTER_VALUES), 4)
-        self.add_to_bag(Tile("E", LETTER_VALUES), 12)
-        self.add_to_bag(Tile("F", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("G", LETTER_VALUES), 3)
-        self.add_to_bag(Tile("H", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("I", LETTER_VALUES), 9)
-        self.add_to_bag(Tile("J", LETTER_VALUES), 1)
-        self.add_to_bag(Tile("K", LETTER_VALUES), 1)
-        self.add_to_bag(Tile("L", LETTER_VALUES), 4)
-        self.add_to_bag(Tile("M", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("N", LETTER_VALUES), 6)
-        self.add_to_bag(Tile("O", LETTER_VALUES), 8)
-        self.add_to_bag(Tile("P", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("Q", LETTER_VALUES), 1)
-        self.add_to_bag(Tile("R", LETTER_VALUES), 6)
-        self.add_to_bag(Tile("S", LETTER_VALUES), 4)
-        self.add_to_bag(Tile("T", LETTER_VALUES), 6)
-        self.add_to_bag(Tile("U", LETTER_VALUES), 4)
-        self.add_to_bag(Tile("V", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("W", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("X", LETTER_VALUES), 1)
-        self.add_to_bag(Tile("Y", LETTER_VALUES), 2)
-        self.add_to_bag(Tile("Z", LETTER_VALUES), 1)
-        self.add_to_bag(Tile("#", LETTER_VALUES), 2)
-        shuffle(self.bag)
-
-    def take_from_bag(self):
-        #Removes a tile from the bag and returns it to the user. This is used for replenishing the rack.
-        return self.bag.pop()
-
-    def get_remaining_tiles(self):
-        #Returns the number of tiles left in the bag.
-        return len(self.bag)
-
-class Rack:
-    """
-    Creates each player's 'dock', or 'hand'. Allows players to add, remove and replenish the number of tiles in their hand.
-    """
-    def __init__(self, bag):
-        #Initializes the player's rack/hand. Takes the bag from which the racks tiles will come as an argument.
-        self.rack = []
-        self.bag = bag
-        self.initialize()
-
-    def add_to_rack(self):
-        #Takes a tile from the bag and adds it to the player's rack.
-        self.rack.append(self.bag.take_from_bag())
-
-    def initialize(self):
-        #Adds the initial 7 tiles to the player's hand.
-        for i in range(7):
-            self.add_to_rack()
-
-    def get_rack_str(self):
-        #Displays the user's rack in string form.
-        return ", ".join(str(item.get_letter()) for item in self.rack)
-
-    def get_rack_arr(self):
-        #Returns the rack as an array of tile instances
-        return self.rack
-
-    def remove_from_rack(self, tile):
-        #Removes a tile from the rack (for example, when a tile is being played).
-        self.rack.remove(tile)
-
-    def get_rack_length(self):
-        #Returns the number of tiles left in the rack.
-        return len(self.rack)
-
-    def replenish_rack(self):
-        #Adds tiles to the rack after a turn such that the rack will have 7 tiles (assuming a proper number of tiles in the bag).
-        while self.get_rack_length() < 7 and self.bag.get_remaining_tiles() > 0:
-            self.add_to_rack()
-
-class Player:
-    """
-    Creates an instance of a player. Initializes the player's rack, and allows you to set/get a player name.
-    """
-    def __init__(self, bag):
-        #Intializes a player instance. Creates the player's rack by creating an instance of that class.
-        #Takes the bag as an argument, in order to create the rack.
-        self.name = ""
-        self.rack = Rack(bag)
-        self.score = 0
-
-    def set_name(self, name):
-        #Sets the player's name.
-        self.name = name
-
-    def get_name(self):
-        #Gets the player's name.
-        return self.name
-
-    def get_rack_str(self):
-        #Returns the player's rack.
-        return self.rack.get_rack_str()
-
-    def get_rack_arr(self):
-        #Returns the player's rack in the form of an array.
-        return self.rack.get_rack_arr()
-
-    def increase_score(self, increase):
-        #Increases the player's score by a certain amount. Takes the increase (int) as an argument and adds it to the score.
-        self.score += increase
-
-    def get_score(self):
-        #Returns the player's score
-        return self.score
-
-class Board:
-    """
-    Creates the scrabble board.
+    A linked list implementation of a Scrabble board.
+    The board is a 15x15 grid of cells, where each cell is a BoardNode.
     """
     def __init__(self):
-        #Creates a 2-dimensional array that will serve as the board, as well as adds in the premium squares.
-        self.board = [["   " for i in range(15)] for j in range(15)]
+        # Constants for premium squares
+        self.TRIPLE_WORD_SCORE = ((0,0), (7, 0), (14,0), (0, 7), (14, 7), (0, 14), (7, 14), (14,14))
+        self.DOUBLE_WORD_SCORE = ((1,1), (2,2), (3,3), (4,4), (1, 13), (2, 12), (3, 11), (4, 10), (7, 7), (13, 1), (12, 2), (11, 3), (10, 4), (13,13), (12, 12), (11,11), (10,10))
+        self.TRIPLE_LETTER_SCORE = ((1,5), (1, 9), (5,1), (5,5), (5,9), (5,13), (9,1), (9,5), (9,9), (9,13), (13, 5), (13,9))
+        self.DOUBLE_LETTER_SCORE = ((0, 3), (0,11), (2,6), (2,8), (3,0), (3,7), (3,14), (6,2), (6,6), (6,8), (6,12), (7,3), (7,11), (8,2), (8,6), (8,8), (8, 12), (11,0), (11,7), (11,14), (12,6), (12,8), (14, 3), (14, 11))
+        
+        self.size = 15
+        self.init_board()
         self.add_premium_squares()
-        self.board[7][7] = " * "
+        
+    def init_board(self):
+        """Initialize the board as a linked list structure."""
+        # First, create all the nodes
+        nodes = [[self.BoardNode() for _ in range(self.size)] for _ in range(self.size)]
+        
+        # Set positions for each node
+        for i in range(self.size):
+            for j in range(self.size):
+                nodes[i][j].position = (i, j)
+        
+        # Connect nodes horizontally
+        for i in range(self.size):
+            for j in range(self.size - 1):
+                nodes[i][j].right = nodes[i][j + 1]
+                nodes[i][j + 1].left = nodes[i][j]
+        
+        # Connect nodes vertically
+        for i in range(self.size - 1):
+            for j in range(self.size):
+                nodes[i][j].down = nodes[i + 1][j]
+                nodes[i + 1][j].up = nodes[i][j]
+        
+        # Store the top-left node as the starting point
+        self.start_node = nodes[0][0]
 
     def get_board(self):
-        #Returns the board in string form.
-        board_str = "   |  " + "  |  ".join(str(item) for item in range(10)) + "  | " + "  | ".join(str(item) for item in range(10, 15)) + " |"
+        """Get a string representation of the board."""
+        # Header row with column numbers
+        board_str = "   |  " + "  |  ".join(str(i) for i in range(10)) + "  | " + "  | ".join(str(i) for i in range(10, 15)) + " |"
         board_str += "\n   _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _\n"
-        board = list(self.board)
-        for i in range(len(board)):
+        
+        # Each row of the board
+        for i in range(self.size):
+            row_cells = []
+            current = self.get_node(i, 0)
+            
+            # Collect string representations of each cell in the row
+            for j in range(self.size):
+                row_cells.append(current.get_display_str())
+                current = current.right
+            
+            # Row prefix with row number
             if i < 10:
-                board[i] = str(i) + "  | " + " | ".join(str(item) for item in board[i]) + " |"
-            if i >= 10:
-                board[i] = str(i) + " | " + " | ".join(str(item) for item in board[i]) + " |"
-        board_str += "\n   |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|\n".join(board)
+                row_str = str(i) + "  | " + " | ".join(row_cells) + " |"
+            else:
+                row_str = str(i) + " | " + " | ".join(row_cells) + " |"
+            
+            board_str += row_str
+            
+            # Add separator row if not the last row
+            if i < self.size - 1:
+                board_str += "\n   |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|\n"
+        
+        # Bottom border
         board_str += "\n   _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _"
+        
         return board_str
 
     def add_premium_squares(self):
-        #Adds all of the premium squares that influence the word's score.
-        TRIPLE_WORD_SCORE = ((0,0), (7, 0), (14,0), (0, 7), (14, 7), (0, 14), (7, 14), (14,14))
-        DOUBLE_WORD_SCORE = ((1,1), (2,2), (3,3), (4,4), (1, 13), (2, 12), (3, 11), (4, 10), (7, 7), (13, 1), (12, 2), (11, 3), (10, 4), (13,13), (12, 12), (11,11), (10,10))
-        TRIPLE_LETTER_SCORE = ((1,5), (1, 9), (5,1), (5,5), (5,9), (5,13), (9,1), (9,5), (9,9), (9,13), (13, 5), (13,9))
-        DOUBLE_LETTER_SCORE = ((0, 3), (0,11), (2,6), (2,8), (3,0), (3,7), (3,14), (6,2), (6,6), (6,8), (6,12), (7,3), (7,11), (8,2), (8,6), (8,8), (8, 12), (11,0), (11,7), (11,14), (12,6), (12,8), (14, 3), (14, 11))
+        """Add premium square designations to the board."""
+        for row, col in self.TRIPLE_WORD_SCORE:
+            node = self.get_node(row, col)
+            node.score_multiplier = "TWS"
+        
+        for row, col in self.DOUBLE_WORD_SCORE:
+            node = self.get_node(row, col)
+            node.score_multiplier = "DWS"
+        
+        for row, col in self.TRIPLE_LETTER_SCORE:
+            node = self.get_node(row, col)
+            node.score_multiplier = "TLS"
+        
+        for row, col in self.DOUBLE_LETTER_SCORE:
+            node = self.get_node(row, col)
+            node.score_multiplier = "DLS"
 
-        for coordinate in TRIPLE_WORD_SCORE:
-            self.board[coordinate[0]][coordinate[1]] = "TWS"
-        for coordinate in TRIPLE_LETTER_SCORE:
-            self.board[coordinate[0]][coordinate[1]] = "TLS"
-        for coordinate in DOUBLE_WORD_SCORE:
-            self.board[coordinate[0]][coordinate[1]] = "DWS"
-        for coordinate in DOUBLE_LETTER_SCORE:
-            self.board[coordinate[0]][coordinate[1]] = "DLS"
-
-    def place_word(self, word, location, direction, player):
-        #Allows you to play words, assuming that they have already been confirmed as valid.
-        global premium_spots
-        premium_spots = []
+    def place_word(self, word, location, direction, player, placed_tiles):
+        """Places a word on the board and calculates its score."""
         direction = direction.lower()
         word = word.upper()
-
-        #Places the word going rightwards
-        if direction.lower() == "right":
-            for i in range(len(word)):
-                if self.board[location[0]][location[1]+i] != "   ":
-                    premium_spots.append((word[i], self.board[location[0]][location[1]+i]))
-                self.board[location[0]][location[1]+i] = " " + word[i] + " "
-
-        #Places the word going downwards
-        elif direction.lower() == "down":
-            for i in range(len(word)):
-                if self.board[location[0]][location[1]+i] != "   ":
-                    premium_spots.append((word[i], self.board[location[0]][location[1]+i]))
-                self.board[location[0]+i][location[1]] = " " + word[i] + " "
-
-        #Removes tiles from player's rack and replaces them with tiles from the bag.
-        for letter in word:
-            for tile in player.get_rack_arr():
-                if tile.get_letter() == letter:
-                    player.rack.remove_from_rack(tile)
+        used_tiles = []
+        
+        start_row, start_col = location
+        
+        # First check if the word contains blanks (#) and get their positions
+        blankpos = [i for i, letter in enumerate(word) if letter == '#']
+        j = 0
+        # For each letter in the word
+        for i, letter in enumerate(word):
+            row, col = start_row, start_col
+            if direction == "right":
+                col += i
+            elif direction == "down":  # direction == "down"
+                row += i
+            else:
+                print("Give valid direction for word placement\n")
+                return False
+            
+            # Get the node at this position
+            node = self.get_node(row, col)
+            
+            # Find matching tile in player's rack
+            is_blank = i in blankpos
+            used_tile = None
+            
+            if node is not None and node.tile is not None:
+                continue
+                
+            else:
+                for tile in player.rack.get_rack_arr():
+                    # For blank tiles, look for '#'
+                    if is_blank and tile.get_letter() == '#':
+                        used_tile = tile
+                        node.place_blank(used_tile, placed_tiles[i][1])
+                        j += 1
+                        break
+                    # For regular tiles, look for matching letter
+                    elif not is_blank and tile.get_letter() == letter:
+                        used_tile = tile
+                        node.place_tile(used_tile)
+                        j += 1
+                        break
+                
+                if not used_tile:
+                    # Try to use a blank tile if regular tile not found
+                    if not is_blank:
+                        for tile in player.rack.rack:
+                            if tile.get_letter() == '#':
+                                used_tile = tile
+                                is_blank = True
+                                node.place_blank(used_tile, placed_tiles[i][1])
+                                j += 1
+                                break
+            
+            if used_tile:
+                used_tiles.append(used_tile)
+                
+                # Place the tile on the board
+                #(used_tile, letter)        
+        
+        # # Apply word multiplier
+        # total_score *= word_multiplier
+        
+        # Remove used tiles from rack
+        for tile in used_tiles:
+            print(f"Placing {tile.get_letter()} from rack")
+            player.rack.remove_from_rack(tile)
+            
+        print(f"Move used {j} tiles")
+        
+        # Replenish rack
         player.rack.replenish_rack()
 
-    def board_array(self):
-        #Returns the 2-dimensional board array.
-        return self.board
+        return True
+    
+    def get_node(self, row, col):
+        """Get the node at the specified position."""
+        if row < 0 or row >= self.size or col < 0 or col >= self.size:
+            return None
+        
+        # Navigate to the requested node
+        current = self.start_node
+        
+        # Move down to the correct row
+        for _ in range(row):
+            current = current.down
+        
+        # Move right to the correct column
+        for _ in range(col):
+            current = current.right
+        
+        return current
 
-class Word:
-    def __init__(self, word, location, player, direction, board):
-        self.word = word.upper()
-        self.location = location
-        self.player = player
-        self.direction = direction.lower()
-        self.board = board
+    def deep_copy_board(self):
+        new_board = ScrabbleBoard()
+        # Map from original nodes to new nodes for reference
+        node_map = {}
+        # First pass: Create all nodes with their properties (except connections)
+        original_node = self.start_node
+        row = 0
+        while original_node:
+            col_node = original_node
+            col = 0
+            while col_node:
+                # Find the corresponding new node
+                new_node = self._get_node_at_position(new_board.start_node, (row, col))
+                
+                # Copy properties
+                if col_node.tile:
+                    new_node.tile = copy.deepcopy(col_node.tile)
+                new_node.score_multiplier = col_node.score_multiplier
+                
+                # Add to map
+                node_map[col_node] = new_node
+                
+                # Move to next column
+                col_node = col_node.right
+                col += 1
+                
+            # Move to next row
+            original_node = original_node.down
+            row += 1
+            
+        return new_board
+    
+    def _get_node_at_position(self, start_node, position):
+        """
+        Get the node at a specific position starting from the top-left node.
+        """
+        row, col = position
+        current = start_node
+        
+        # Move down to the correct row
+        for _ in range(row):
+            if current.down:
+                current = current.down
+            else:
+                return None
+        
+        # Move right to the correct column
+        for _ in range(col):
+            if current.right:
+                current = current.right
+            else:
+                return None
+        
+        return current
 
-    def check_word(self):
-        #Checks the word to make sure that it is in the dictionary, and that the location falls within bounds.
-        #Also controls the overlapping of words.
-        global round_number, players
-        word_score = 0
-        global dictionary 
-        if "dictionary" not in globals():
-            dictionary = open("build\\scrabbledict.txt").read().splitlines()
+##############################################################################3###
 
-        current_board_ltr = ""
-        needed_tiles = ""
-        blank_tile_val = ""
 
-        #Assuming that the player is not skipping the turn:
-        if self.word != "":
+class Game:
+    def __init__(self):
+        self.round_number = 1
+        self.players = []
+        self.skipped_turns = 0
+        self.board = ScrabbleBoard()
+        self.bag = Bag()
+        self.init_dict()
 
-            #Allows for players to declare the value of a blank tile.
-            if "#" in self.word:
-                while len(blank_tile_val) != 1:
-                    blank_tile_val = input("Please enter the letter value of the blank tile: ")
-                self.word = self.word[:word.index("#")] + blank_tile_val.upper() + self.word[(word.index("#")+1):]
+    def add_player(self, player):
+        """Add a player to the game"""
+        self.players.append(player)
 
-            #Reads in the board's current values under where the word that is being played will go. Raises an error if the direction is not valid.
-            if self.direction == "right":
-                for i in range(len(self.word)):
-                    if self.board[self.location[0]][self.location[1]+i][1] == " " or self.board[self.location[0]][self.location[1]+i] == "TLS" or self.board[self.location[0]][self.location[1]+i] == "TWS" or self.board[self.location[0]][self.location[1]+i] == "DLS" or self.board[self.location[0]][self.location[1]+i] == "DWS" or self.board[self.location[0]][self.location[1]+i][1] == "*":
-                        current_board_ltr += " "
+    def init_dict(self):
+        dict_file_path = "build/scrabbledict.txt"
+        dict = load_dictionary_from_file(dict_file_path)
+        self.dictionary = dict
+
+    def turn(self, player):
+        """
+        Handle a player's turn
+        """
+        if (self.skipped_turns < 6) or (player.rack.get_rack_length() == 0 and self.bag.get_remaining_tiles() == 0):
+            print(f"\nRound {self.round_number}: {player.get_name()}'s turn \n")
+            print(self.board.get_board())
+            print(f"\n{player.get_name()}'s Letter Rack: {player.get_rack_str()}")
+
+            # Check if the player is an AI
+            if isinstance(player, ScrabbleAI):
+                print(f"[{player.get_name()} is thinking...]")
+
+                best_move, action = player.make_move()
+                # Get AI's move
+                if action == "sk1p" and not best_move:
+                    print(f"{player.get_name()} has no valid moves. Skipping turn.")
+                    self.skipped_turns += 1
+                else:
+                    word_to_play = best_move[0]
+                    location = best_move[1]
+                    direction = best_move[2]
+                    
+                    print(f"{player.get_name()} plays: {word_to_play} at {location} going {direction}")
+                    
+                    # Create and validate the word
+                    word = Word(word_to_play, location, player, direction, self.board)
+                    valid, placed = word.check_word()
+                    
+                    if valid:
+                        self.board.place_word(word_to_play, location, direction, player, placed)
+                        word_score = word.calculate_word_score(placed)
+                        print(f"Word '{word.word}' placed for {word_score} points!")
+                        player.increase_score(word_score)
+                        self.skipped_turns = 0
                     else:
-                        current_board_ltr += self.board[self.location[0]][self.location[1]+i][1]
-            elif self.direction == "down":
-                for i in range(len(self.word)):
-                    if self.board[self.location[0]+i][self.location[1]] == "   " or self.board[self.location[0]+i][self.location[1]] == "TLS" or self.board[self.location[0]+i][self.location[1]] == "TWS" or self.board[self.location[0]+i][self.location[1]] == "DLS" or self.board[self.location[0]+i][self.location[1]] == "DWS" or self.board[self.location[0]+i][self.location[1]] == " * ":
-                        current_board_ltr += " "
+                        print(f"{player.get_name()} attempted invalid word. Skipping.")
+                        self.skipped_turns += 1
+
+                input("Paused (press enter to continue)")
+            
+            # Human player's turn
+            else:
+                placed = []
+                checked = False
+                while not checked:
+                    word_to_play = input("Word to play: ")
+                    
+                    # Check if player wants to skip turn
+                    if word_to_play.lower() == "":
+                        print(f"{player.get_name()} skips their turn.")
+                        self.skipped_turns += 1
+                        checked = True
+                        break
+                        
+                    location = []
+                    col = input("Column number: ")
+                    row = input("Row number: ")
+                    if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
+                        location = [-1, -1]
                     else:
-                        current_board_ltr += self.board[self.location[0]+i][self.location[1]][1]
+                        location = [int(row), int(col)]
+                    direction = input("Direction of word (right or down): ")
+
+                    word = Word(word_to_play, location, player, direction, self.board)
+
+                    # Handle blank tiles
+                    blank_positions = [m.start() for m in re.finditer('#', word_to_play)]
+                    blank_tiles_values = []
+                    if blank_positions:
+                        print(f"{len(blank_positions)} BLANK(S) DETECTED")
+                        for i, pos in enumerate(blank_positions):
+                            blank_value = input(f"Please enter the letter value of blank tile {i+1}: ").upper()
+                            blank_tiles_values.append(blank_value)
+                        modified_word = list(word_to_play)
+                        for i, pos in enumerate(blank_positions):
+                            modified_word[pos] = blank_tiles_values[i]
+                        new_word = ''.join(modified_word)
+                        word.set_word(new_word)
+
+                    checked, placed = word.check_word()
+                
+                if checked and not word_to_play.lower() in "":
+                    success = self.board.place_word(word_to_play, location, direction, player, placed)
+                    word_score = word.calculate_word_score(placed)
+                    if success:
+                        print(f"Word '{word.word}' placed for {word_score} points!")
+                        player.increase_score(word_score)
+                        self.skipped_turns = 0
+                    else:
+                        print("Failed to place word. Skipping turn.")
+                        self.skipped_turns += 1
+
+            print(f"\n{player.get_name()}'s score is: {player.get_score()}")
+
+            # Determine next player
+            if self.players.index(player) != (len(self.players) - 1):
+                next_player = self.players[self.players.index(player) + 1]
             else:
-                return "Error: please enter a valid direction."
+                next_player = self.players[0]
+                self.round_number += 1
+            player.set_curr(False)
+            next_player.set_curr(True)
 
-            #Raises an error if the word being played is not in the official scrabble dictionary (dic.txt).
-            if self.word not in dictionary:
-                return "Please enter a valid dictionary word.\n"
-
-            #Ensures that the words overlap correctly. If there are conflicting letters between the current board and the word being played, raises an error.
-            for i in range(len(self.word)):
-                if current_board_ltr[i] == " ":
-                    needed_tiles += self.word[i]
-                elif current_board_ltr[i] != self.word[i]:
-                    print("Current_board_ltr: " + str(current_board_ltr) + ", Word: " + self.word + ", Needed_Tiles: " + needed_tiles)
-                    return "The letters do not overlap correctly, please choose another word."
-
-            #If there is a blank tile, remove it's given value from the tiles needed to play the word.
-            if blank_tile_val != "":
-                needed_tiles = needed_tiles[needed_tiles.index(blank_tile_val):] + needed_tiles[:needed_tiles.index(blank_tile_val)]
-
-            #Ensures that the word will be connected to other words on the playing board.
-            if (round_number != 1 or (round_number == 1 and players[0] != self.player)) and current_board_ltr == " " * len(self.word):
-                print("Current_board_ltr: " + str(current_board_ltr) + ", Word: " + self.word + ", Needed_Tiles: " + needed_tiles)
-                return "Please connect the word to a previously played letter."
-
-            #Raises an error if the player does not have the correct tiles to play the word.
-            for letter in needed_tiles:
-                if letter not in self.player.get_rack_str() or self.player.get_rack_str().count(letter) < needed_tiles.count(letter):
-                    return "You do not have the tiles for this word\n"
-
-            #Raises an error if the location of the word will be out of bounds.
-            if self.location[0] > 14 or self.location[1] > 14 or self.location[0] < 0 or self.location[1] < 0 or (self.direction == "down" and (self.location[0]+len(self.word)-1) > 14) or (self.direction == "right" and (self.location[1]+len(self.word)-1) > 14):
-                return "Location out of bounds.\n"
-
-            #Ensures that first turn of the game will have the word placed at (7,7).
-            if round_number == 1 and players[0] == self.player and self.location != [7,7]:
-                return "The first turn must begin at location (7, 7).\n"
-            return True
-
-        #If the user IS skipping the turn, confirm. If the user replies with "Y", skip the player's turn. Otherwise, allow the user to enter another word.
+            # Refill player's rack
+            player.rack.replenish_rack()
+            
+            # Recursive call for next player's turn
+            self.turn(next_player)
         else:
-            if input("Are you sure you would like to skip your turn? (y/n)").upper() == "Y":
-                if round_number == 1 and players[0] == self.player:
-                    return "Please do not skip the first turn. Please enter a word."
-                return True
-            else:
-                return "Please enter a word."
+            self.end_game()
 
-    def calculate_word_score(self):
-        #Calculates the score of a word, allowing for the impact by premium squares.
-        global LETTER_VALUES, premium_spots
-        word_score = 0
-        for letter in self.word:
-            for spot in premium_spots:
-                if letter == spot[0]:
-                    if spot[1] == "TLS":
-                        word_score += LETTER_VALUES[letter] * 2
-                    elif spot[1] == "DLS":
-                        word_score += LETTER_VALUES[letter]
-            word_score += LETTER_VALUES[letter]
-        for spot in premium_spots:
-            if spot[1] == "TWS":
-                word_score *= 3
-            elif spot[1] == "DWS":
-                word_score *= 2
-        self.player.increase_score(word_score)
+    def start_game(self):
+        """Start a game with human players only"""
+        # Create players
+        num_players = int(input("Enter number of players (2-4): "))
+        for i in range(min(num_players, 4)):
+            player = Player(self.bag, self.dictionary, self.board)
+            player.set_name(input(f"Enter name for player {i+1}: "))
+            self.add_player(player)
+        
+        # Start the game with the first player
+        self.turn(self.players[0])
 
-    def set_word(self, word):
-        self.word = word.upper()
+    def start_game_vs_ai(self):
+        """Start a game with one human player and one AI player"""
+        # Create human player
+        human = Player(self.bag, self.dictionary, self.board)
+        human.set_name(input("Enter your name: "))
+        self.add_player(human)
+        
+        # Create AI player
+        ai_strategy = input("Select AI strategy (MCTS/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
+        ai = ScrabbleAI(self.bag, self.dictionary, self.board, ai_strategy)
+        self.add_player(ai)
+        
+        # Start the game with the human player
+        self.turn(self.players[0])
 
-    def set_location(self, location):
-        self.location = location
+    def start_ai_game(self):
+        """Start a game with AI players only"""
+        # Create AI players
+        num_ais = int(input("Enter number of AI players (2-4): "))
+        for i in range(min(num_ais, 4)):
+            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
+            ai = ScrabbleAI(self.bag, self.dictionary, self.board, ai_strategy)
+            self.add_player(ai)
+        
+        # Start the game with the first AI
+        self.turn(self.players[0])
 
-    def set_direction(self, direction):
-        self.direction = direction
+    def end_game(self):
+        """Forces the game to end when the bag runs out of tiles or too many skipped turns."""
+        print("\nGame Over!")
+        
+        # Deduct points for remaining tiles in rack
+        for player in self.players:
+            deduction = 0
+            for tile in player.rack.get_rack_arr():
+                if tile in LETTER_VALUES:
+                    deduction += LETTER_VALUES[tile.get_letter()]
+            player.increase_score(-deduction)
+            if deduction > 0:
+                print(f"{player.get_name()} loses {deduction} points for unplayed tiles.")
 
-    def get_word(self):
-        return self.word
+        # Find winner
+        highest_score = -1
+        winning_player = None
+        all_player_scores = {}
+        
+        for player in self.players:
+            all_player_scores[player.get_name()] = player.get_score()
+            if player.get_score() > highest_score:
+                highest_score = player.get_score()
+                winning_player = player.get_name()
+        
+        # Display results
+        print(f"\nThe game is over! {winning_player} has won with {highest_score} points!")
+        for player_name, score in all_player_scores.items():
+            if player_name != winning_player:
+                print(f"{player_name} ended the game with {score} points!")
 
-def turn(player, board, bag):
-    #Begins a turn, by displaying the current board, getting the information to play a turn, and creates a recursive loop to allow the next person to play.
-    global round_number, players, skipped_turns
-
-    #If the number of skipped turns is less than 6 and a row, and there are either tiles in the bag, or no players have run out of tiles, play the turn.
-    #Otherwise, end the game.
-    if (skipped_turns < 6) or (player.rack.get_rack_length() == 0 and bag.get_remaining_tiles() == 0):
-
-        #Displays whose turn it is, the current board, and the player's rack.
-        print("\nRound " + str(round_number) + ": " + player.get_name() + "'s turn \n")
-        print(board.get_board())
-        print("\n" + player.get_name() + "'s Letter Rack: " + player.get_rack_str())
-
-        #Gets information in order to play a word.
-        word_to_play = input("Word to play: ")
-        location = []
-        col = input("Column number: ")
-        row = input("Row number: ")
-        if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
-            location = [-1, -1]
-        else:
-            location = [int(row), int(col)]
-        direction = input("Direction of word (right or down): ")
-
-        word = Word(word_to_play, location, player, direction, board.board_array())
-
-        #If the first word throws an error, creates a recursive loop until the information is given correctly.
-        checked = word.check_word()
-        while checked != True:
-            print(checked)
-            word_to_play = input("Word to play: ")
-            word.set_word(word_to_play)
-            location = []
-            col = input("Column number: ")
-            row = input("Row number: ")
-            if (col == "" or row == "") or (col not in [str(x) for x in range(15)] or row not in [str(x) for x in range(15)]):
-                location = [-1, -1]
-            else:
-                word.set_location([int(row), int(col)])
-                location = [int(row), int(col)]
-            direction = input("Direction of word (right or down): ")
-            word.set_direction(direction)
-            checked = word.check_word()
-
-        #If the user has confirmed that they would like to skip their turn, skip it.
-        #Otherwise, plays the correct word and prints the board.
-        if word.get_word() == "":
-            print("Your turn has been skipped.")
-            skipped_turns += 1
-        else:
-            board.place_word(word_to_play, location, direction, player)
-            word.calculate_word_score()
-            skipped_turns = 0
-
-        #Prints the current player's score
-        print("\n" + player.get_name() + "'s score is: " + str(player.get_score()))
-
-        #Gets the next player.
-        if players.index(player) != (len(players)-1):
-            player = players[players.index(player)+1]
-        else:
-            player = players[0]
-            round_number += 1
-
-        #Recursively calls the function in order to play the next turn.
-        turn(player, board, bag)
-
-    #If the number of skipped turns is over 6 or the bag has both run out of tiles and a player is out of tiles, end the game.
+def main():
+    game = Game()
+    
+    print("Welcome to Scrabble!")
+    game_type = input("Select game type:\n1. Human vs Human\n2. Human vs AI\n3. AI vs AI\nChoice: ")
+    
+    if game_type == "1":
+        game.start_game()
+    elif game_type == "2":
+        game.start_game_vs_ai()
+    elif game_type == "3":
+        game.start_ai_game()
     else:
-        end_game()
+        print("Invalid choice. Starting Human vs Human game by default.")
+        game.start_game()
 
-def start_game():
-    #Begins the game and calls the turn function.
-    global round_number, players, skipped_turns
-    board = Board()
-    bag = Bag()
 
-    #Asks the player for the number of players.
-    num_of_players = 2
+if __name__ == "__main__":
+    main()
 
-    #Welcomes players to the game and allows players to choose their name.
-    print("\nWelcome to Scrabble! Please enter the names of the players below.")
-    players = []
-    for i in range(num_of_players):
-        players.append(Player(bag))
-        players[i].set_name(input("Please enter player " + str(i+1) + "'s name: "))
 
-    #Sets the default value of global variables.
-    round_number = 1
-    skipped_turns = 0
-    current_player = players[0]
-    turn(current_player, board, bag)
+# if __name__ == "__main__":
+#     from word_generator import load_dictionary, get_possible_words
 
-def end_game():
-    #Forces the game to end when the bag runs out of tiles.
-    global players
-    highest_score = 0
-    winning_player = ""
-    for player in players:
-        if player.get_score > highest_score:
-            highest_score = player.get_score()
-            winning_player = player.get_name()
-    print("The game is over! " + winning_player + ", you have won!")
+#     # Example placeholder objects for standalone testing
+#     class FakeBoard:
+#         def __init__(self):
+#             self.grid = [[" " for _ in range(15)] for _ in range(15)]
 
-    if input("\nWould you like to play again? (y/n)").upper() == "Y":
-        start_game()
+#     class FakePlayer:
+#         def __init__(self, rack):
+#             self.rack = rack
 
-start_game()
+#     board = FakeBoard()
+#     player = FakePlayer(['S', 'T', 'A', 'R', 'E', 'L', 'D'])
+
+#     dicttrie = load_dictionary_from_file("scrabbledict.txt")
+
+#     dictionary = load_dictionary("scrabbledict.txt")
+#     legal_moves = get_possible_words(board, player.rack, dictionary, player, Word)
+
+#     initial_state = {
+#         'board': board,
+#         'rack': player.rack,
+#         'legal_moves': legal_moves,
+#         'player': player  # ← Add this
+#     }
+
+#     best_move = monte_carlo_tree_search(initial_state, iterations=500)
+#     print("Best Move Found:", best_move)
