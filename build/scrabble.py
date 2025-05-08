@@ -4,6 +4,7 @@ from dictionarytrie import DictionaryTrie
 from word import Word, load_dictionary_from_file
 from algos import ScrabbleAI
 from player import Tile, Bag, Rack, Player
+import copy
 
 # from mcts_scrabble import monte_carlo_tree_search
 # mcts_scrabble.py
@@ -177,7 +178,7 @@ class ScrabbleBoard:
         
         # First check if the word contains blanks (#) and get their positions
         blankpos = [i for i, letter in enumerate(word) if letter == '#']
-        
+        j = 0
         # For each letter in the word
         for i, letter in enumerate(word):
             row, col = start_row, start_col
@@ -197,7 +198,7 @@ class ScrabbleBoard:
             used_tile = None
             
             if node is not None and node.tile is not None:
-                print("Tile already placed in previous move\n")
+                continue
                 
             else:
                 for tile in player.rack.get_rack_arr():
@@ -205,13 +206,13 @@ class ScrabbleBoard:
                     if is_blank and tile.get_letter() == '#':
                         used_tile = tile
                         node.place_blank(used_tile, placed_tiles[i][1])
-                        print(f"Placing tile # as {placed_tiles[i][1]}")
+                        j += 1
                         break
                     # For regular tiles, look for matching letter
                     elif not is_blank and tile.get_letter() == letter:
                         used_tile = tile
                         node.place_tile(used_tile)
-                        print(f"Placing tile {used_tile.get_letter()}")
+                        j += 1
                         break
                 
                 if not used_tile:
@@ -221,8 +222,8 @@ class ScrabbleBoard:
                             if tile.get_letter() == '#':
                                 used_tile = tile
                                 is_blank = True
-                                print(f"Using {used_tile.get_letter()} to fill in gaps of your play.")
                                 node.place_blank(used_tile, placed_tiles[i][1])
+                                j += 1
                                 break
             
             if used_tile:
@@ -236,8 +237,10 @@ class ScrabbleBoard:
         
         # Remove used tiles from rack
         for tile in used_tiles:
-            print(f"Removing {tile.get_letter()} from rack")
+            print(f"Placing {tile.get_letter()} from rack")
             player.rack.remove_from_rack(tile)
+            
+        print(f"Move used {j} tiles")
         
         # Replenish rack
         player.rack.replenish_rack()
@@ -262,19 +265,19 @@ class ScrabbleBoard:
         
         return current
 
-    def deep_copy_board(board):
+    def deep_copy_board(self):
         new_board = ScrabbleBoard()
         # Map from original nodes to new nodes for reference
         node_map = {}
         # First pass: Create all nodes with their properties (except connections)
-        original_node = board.start_node
+        original_node = self.start_node
         row = 0
         while original_node:
             col_node = original_node
             col = 0
             while col_node:
                 # Find the corresponding new node
-                new_node = _get_node_at_position(new_board.start_node, (row, col))
+                new_node = self._get_node_at_position(new_board.start_node, (row, col))
                 
                 # Copy properties
                 if col_node.tile:
@@ -294,7 +297,7 @@ class ScrabbleBoard:
             
         return new_board
     
-    def _get_node_at_position(start_node, position):
+    def _get_node_at_position(self, start_node, position):
         """
         Get the node at a specific position starting from the top-left node.
         """
@@ -352,14 +355,7 @@ class Game:
                 print(f"[{player.get_name()} is thinking...]")
 
                 best_move, action = player.make_move()
-
-                
                 # Get AI's move
-                if player.get_name() in ["AI_MCTS", "AI_BEAM"]:
-                    player.make_move()
-                else:
-                    best_move, action = player.make_move()
-                
                 if action == "sk1p" and not best_move:
                     print(f"{player.get_name()} has no valid moves. Skipping turn.")
                     self.skipped_turns += 1
@@ -384,7 +380,7 @@ class Game:
                         print(f"{player.get_name()} attempted invalid word. Skipping.")
                         self.skipped_turns += 1
 
-                input("Continue? :")
+                input("Paused (press enter to continue)")
             
             # Human player's turn
             else:
@@ -477,7 +473,7 @@ class Game:
         self.add_player(human)
         
         # Create AI player
-        ai_strategy = input("Select AI strategy (MCTS/BEAM/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
+        ai_strategy = input("Select AI strategy (MCTS/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
         ai = ScrabbleAI(self.bag, self.dictionary, self.board, ai_strategy)
         self.add_player(ai)
         
@@ -489,7 +485,7 @@ class Game:
         # Create AI players
         num_ais = int(input("Enter number of AI players (2-4): "))
         for i in range(min(num_ais, 4)):
-            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/Beam/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
+            ai_strategy = input(f"Select strategy for AI {i+1} (MCTS/ASTAR/GBFS/BFS/DFS/UCS): ").upper()
             ai = ScrabbleAI(self.bag, self.dictionary, self.board, ai_strategy)
             self.add_player(ai)
         

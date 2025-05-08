@@ -1,5 +1,5 @@
 from dictionarytrie import DictionaryTrie
-from player import Player
+from player import Player, Tile
 import random
 from collections import deque
 import heapq
@@ -97,17 +97,9 @@ class ScrabbleAI(Player):
             The best move according t
             the selected strategy
         """
-        if self.name == "AI_GBFS":
-            # Greedy best first search strategy
-            # return get_gbfs_move(self.board, self.rack, self.dict)
-            return None
-        elif self.name == "AI_ASTAR":
+        if self.name == "AI_ASTAR":
             # A* strategy
             return get_astar_move(self.board, self.rack, self.dict)
-        elif self.name == "AI_BEAM":
-            # Beam strategy
-            # return get_beam_move(self.board, self.rack, self.dict)
-            return get_beam_move(self.board, self.rack, self, self.rack.bag, self.dict, 5, 3)
         elif self.name == "AI_BFS":
             # BFS strategy
             return get_bfs_move(self.board, self.rack, self.dict)
@@ -117,6 +109,9 @@ class ScrabbleAI(Player):
         elif self.name == "AI_UCS":
             # dFS strategy
             return get_dijkstra_move(self.board, self.rack, self.dict)
+        elif self.name == "AI_GBFS":
+            #GBFS strategy
+            return get_greedy_move(self.board, self.rack, self.dict)
         else: # MCTS strategy
             # Default to Monte Carlo Tree Search strategy
             return get_mcts_move(self.board, self.rack, self.dict)
@@ -374,7 +369,75 @@ def dijkstra_search(node):
 
 ###
 
-def get_beam_move(board, rack, player, bag, dict, beam_width=5, search_depth=3):
+def get_greedy_move(board, rack, dict):
+    valid_moves = find_all_moves(board, rack, dict)
+    if not valid_moves:
+        return None
+    
+    move_tree = create_word_tree(valid_moves, rack, False)
+    return gbfs(move_tree.root)
+    
+def gbfs(node):
+    """
+    Implementation of Greedy Best First Search for finding a move in Scrabble.
+    
+    Unlike Dijkstra's algorithm which considers the cumulative score along a path,
+    GBFS only considers the heuristic value (the score of each individual move).
+    
+    Args:
+        node: The root node of the move tree
+    
+    Returns:
+        The best move [word, position, direction] according to GBFS
+    """
+    best_move = None
+    best_score = -1
+    
+    # Use a counter to break ties and ensure consistent behavior
+    counter = 0
+    
+    # Priority queue stores tuples of (-heuristic_value, counter, node)
+    # Using negative heuristic because heapq is a min-heap but we want max score
+    pq = [(0, counter, node)]
+    counter += 1
+    
+    # Set to keep track of visited nodes
+    visited = set()
+    
+    while pq:
+        # Get node with highest priority (highest heuristic value)
+        current_neg_score, _, current_node = heapq.heappop(pq)
+        
+        # Skip if we've already visited this node
+        if current_node in visited:
+            continue
+        
+        visited.add(current_node)
+        
+        # Check if this is a terminal node with a valid move
+        if hasattr(current_node, 'is_terminal') and current_node.is_terminal:
+            # In GBFS, we only consider the heuristic value (score) of the move itself
+            if hasattr(current_node, 'score') and current_node.score > best_score:
+                best_score = current_node.score
+                best_move = [current_node.word, current_node.position, current_node.direction]
+        
+        # Process all neighbors (children)
+        for child_node in current_node.children.values():
+            if child_node not in visited:
+                # For GBFS, we only consider the heuristic value (score) of the node itself
+                # We don't accumulate scores from the parent
+                child_score = 0
+                if hasattr(child_node, 'score'):
+                    child_score = child_node.score
+                
+                heapq.heappush(pq, (-child_score, counter, child_node))
+                counter += 1
+    
+    return best_move
+
+###
+
+def get_beam_move(board, rack, player, bag, dict, beam_width=3, search_depth=2):
     """
     Find the best move using beam search.
     
@@ -392,83 +455,88 @@ def get_beam_move(board, rack, player, bag, dict, beam_width=5, search_depth=3):
     valid_moves = find_all_moves(board, rack, dict)
     if not valid_moves:
         return None
-        
-    # Initial beam contains just the starting state
+       
+    # Initial beam contains just the starting point
+    # Instead of storing full copies, store the move sequence and score
     initial_state = {
-        'board': board,
-        'player': player,
-        'bag': bag,
-        'score': 0,
         'moves_made': [],
         'cumulative_score': 0
     }
-    
+   
     # Use a list of states as our beam
     current_beam = [initial_state]
+   
+    # Cache all found moves to avoid recalculation
+    # Format: (board_hash, rack_hash) -> list of valid moves
+    move_cache = {}
     
     # For each depth level
     for depth in range(search_depth):
         next_beam = []
-        
+        print(f"Searching depth {depth+1}/{search_depth}, beam size: {len(current_beam)}")
+       
         # Expand each state in the current beam
-        for state in current_beam:
-            # Generate all possible next moves from this state
-            current_board = state['board']
-            current_player = state['player']
-            current_bag = state['bag']
+        for state_idx, state in enumerate(current_beam):
+            # We need to reconstruct the current state by replaying moves
+            current_board = board.copy()  # Shallow copy
+            current_player = player.copy()  # Shallow copy
+            current_bag = bag.copy()  # Shallow copy
             
-            # Get valid moves from this state
-            moves = find_all_moves(current_board, current_player.rack, dict)
+            # Replay all moves to get to this state
+            for move in state['moves_made']:
+                word, position, direction, placed_tiles, move_score = move
+                
+                # Apply move to current_board
+                apply_move_to_board_fast(current_board, word, position, direction, placed_tiles)
+                
+                # Update player's rack and score (without deep copies)
+                update_player_after_move_fast(current_player, current_bag, placed_tiles, move_score)
+            
+            # Generate a hash key for the current board and rack state
+            board_hash = hash_board(current_board)
+            rack_hash = hash_rack(current_player.rack)
+            cache_key = (board_hash, rack_hash)
+            
+            # Check if we've already calculated moves for this state
+            if cache_key in move_cache:
+                moves = move_cache[cache_key]
+            else:
+                # Get valid moves from this state
+                moves = find_all_moves(current_board, current_player.rack, dict)
+                move_cache[cache_key] = moves
+                
             if not moves:
                 # If no moves possible, keep this state in the beam
                 next_beam.append(state)
                 continue
-                
-            # For each move, create a new state
+               
+            # For each move, create a new state (without deep copies)
             for move in moves:
                 word, position, direction, placed_tiles, move_score = move
                 
-                # Create a copy of the current state
-                new_state = copy.deepcopy(state)
-                
-                # Apply the move
-                new_board = deep_copy_board(current_board)
-                new_bag = deep_copy_bag(current_bag)
-                new_player = deep_copy_player(current_player, new_board, new_bag)
-                
-                # Update the state
-                apply_move_to_board(new_board, word, position, direction, placed_tiles)
-                
-                # Update the player's rack and score
-                update_player_after_move(new_player, new_bag, placed_tiles, move_score)
-                
-                # Create a new state
+                # Create a new state that references the previous move sequence
                 new_state = {
-                    'board': new_board,
-                    'player': new_player,
-                    'bag': new_bag,
-                    'score': move_score,
                     'moves_made': state['moves_made'] + [move],
                     'cumulative_score': state['cumulative_score'] + move_score
                 }
                 
                 # Add to candidates for next beam
                 next_beam.append(new_state)
-        
+       
         # Keep only the top beam_width states based on cumulative score
-        current_beam = heapq.nlargest(beam_width, next_beam, 
+        current_beam = heapq.nlargest(beam_width, next_beam,
                                       key=lambda s: s['cumulative_score'])
-        
+       
     if not current_beam:
         return None
-        
+       
     best_state = max(current_beam, key=lambda s: s['cumulative_score'])
-    
+   
     # Return the first move from the best path
     if best_state['moves_made']:
         first_move = best_state['moves_made'][0]
         return [first_move[0], first_move[1], first_move[2]]  # word, pos, direction
-    
+   
     return None
 
     
@@ -529,67 +597,7 @@ def rack_score(placed, rack): # used in astar search
 
     return score
 
-def beam_search(move_tree, beam_width=10):
-    """
-    Perform beam search on the word tree to find the best move.
-    The beam search algorithm works by:
-    1. Starting at the root of the tree
-    2. Evaluating all child nodes
-    3. Keeping only the top N (beam_width) candidates
-    4. Continuing this process until leaf nodes are reached
-    5. Returning the highest scoring move found
-    Args:
-        move_tree: DictionaryTrie containing moves
-        beam_width: Number of candidates to keep at each level
-    Returns:
-        dict: Best move information or None if no moves found
-    """
-    # Start at the root node
-    root = move_tree.root
-    
-    # Initialize the beam with the root node
-    beam = [root]
-    
-    # Best move found so far
-    best_move = None
-    best_score = 0
-    
-    depth = 0
-    
-    # Continue until the beam is empty
-    while beam:
-        depth+=1
-        # Collect all children of nodes in the current beam
-        candidates = []
-        
-        for node in beam:
-            # If this node represents a complete word with attributes
-            if node.word and node.score:
-                # Check if this is the best move found so far
-                if node.score > best_score:
-                    best_move = [
-                        node.word,
-                        node.position,
-                        node.direction,
-                    ]
-                    best_score = node.score
-            
-            # Add all children to candidates
-            for letter, child_node in node.children.items():
-                candidates.append(child_node)
-        
-        # If no candidates, we've reached the end of the tree
-        if not candidates:
-            break
-        
-        # Sort candidates by our multi-criteria scoring function
-        candidates.sort(key=candidate_score, reverse=True)
-        
-        # Keep only the top beam_width candidates
-        beam = candidates[:beam_width]
-    
-    return best_move
-    
+
 def candidate_score(node):
     # Primary criterion: actual score (if available)
     score = getattr(node, 'score', 0) or 0
@@ -1194,7 +1202,7 @@ def deep_copy_bag(bag):
     """
     return copy.deepcopy(bag)
 
-def deep_copy_player(player, new_board, new_bag):
+def deep_copy_player(player, dict, new_board, new_bag):
     """
     Create a deep copy of a Player object, connecting it to the new board and bag.
     """
@@ -1211,9 +1219,9 @@ def deep_copy_player(player, new_board, new_bag):
     if isinstance(player, ScrabbleAI):
         # Create a new AI player
         new_player = ScrabbleAI(
-            player.dict,  # Dictionary can be shared as it doesn't change
+            new_bag,  # Dictionary can be shared as it doesn't change
+            dict,
             new_board,
-            new_bag,
             player.name.split('_')[1] if '_' in player.name else "MCTS"
         )
     # else:
@@ -1229,3 +1237,164 @@ def deep_copy_player(player, new_board, new_bag):
         new_player.score = player.score
         
     return new_player
+
+def apply_move_to_board(board, word, position, direction, placed_tiles):
+    """
+    Apply a move to the board.
+    
+    Args:
+        board: The ScrabbleBoard object
+        word: The word to place
+        position: (row, col) tuple for word start
+        direction: 'across' or 'down'
+        placed_tiles: List of tiles being placed
+    """
+    row, col = position
+    
+    # Place each letter on the board
+    for i, letter in enumerate(word):
+        if direction == 'across':
+            current_pos = (row, col + i)
+        else:  # direction == 'down'
+            current_pos = (row + i, col)
+            
+        # Get the node at this position
+        node = board._get_node_at_position(board.start_node, current_pos)
+        
+        # If this node doesn't already have a tile (it's one we're placing)
+        if node and not node.tile:
+            # Find the correct tile from placed_tiles
+            for _, tile in placed_tiles:
+                row, col = current_pos
+                curr_node = board.get_node(row, col)
+                if tile == letter:
+                    used_tile = Tile(tile, LETTER_VALUES)
+                    curr_node.place_tile(used_tile)
+                elif tile == "#":
+                    used_tile = Tile("#", LETTER_VALUES)
+                    curr_node.place_blank(used_tile, letter)
+                
+def update_player_after_move(player, bag, placed_tiles, move_score):
+    """
+    Update the player's rack and score after making a move.
+    
+    Args:
+        player: Player object to update
+        bag: Bag object to draw from
+        placed_tiles: List of tiles placed on the board
+        move_score: Score from the move
+    """
+    # Remove placed tiles from rack
+    for tile in placed_tiles:
+        if tile in player.rack.rack:
+            player.rack.remove(tile)
+    
+    # Draw new tiles if available
+    while len(player.rack.rack) < 7 and len(bag.tiles) > 0:
+        player.rack.replenish_rack()
+    
+    # Update score
+    player.score += move_score
+    
+def hash_board(board):
+    """
+    Create a hash representation of the board for caching.
+    Only considers tile placements, not the full board object.
+    
+    Args:
+        board: The ScrabbleBoard object
+    
+    Returns:
+        A hashable representation of the board state
+    """
+    # Create a tuple of tuples with occupied positions and their values
+    occupied_positions = []
+    
+    # Iterate through the board's nodes
+    current_node = board.start_node
+    while current_node:
+        row_node = current_node
+        while row_node:
+            if row_node.tile:
+                # Store position and letter
+                pos = (row_node.row, row_node.col)
+                letter = row_node.get_display_letter()
+                occupied_positions.append((pos, letter))
+            row_node = row_node.right
+        current_node = current_node.down
+    
+    # Convert to a tuple for hashability
+    return tuple(sorted(occupied_positions))
+
+def hash_rack(rack):
+    """Create a hashable representation of a rack"""
+    # Sort the tiles for consistent hashing
+    return tuple(sorted(str(tile) for tile in rack.rack))
+
+def apply_move_to_board_fast(board, word, position, direction, placed_tiles):
+    """
+    Apply a move to the board without deep copying.
+    Optimized version that modifies the board in-place.
+    
+    Args:
+        board: The ScrabbleBoard object
+        word: The word to place
+        position: (row, col) tuple for word start
+        direction: 'across' or 'down'
+        placed_tiles: List of tiles being placed
+    """
+    row, col = position
+    
+    # Create a map of positions to placed tiles for quick lookup
+    placed_positions = {}
+    for i, letter in enumerate(word):
+        if direction == 'across':
+            current_pos = (row, col + i)
+        else:  # direction == 'down'
+            current_pos = (row + i, col)
+        
+        # Get the node at this position
+        node = board._get_node_at_position(board.start_node, current_pos)
+        
+        # If this node doesn't already have a tile (it's one we're placing)
+        if node and not node.tile:
+            placed_positions[current_pos] = letter
+    
+    # Now place each tile
+    for tile_info in placed_tiles:
+        tile, pos = tile_info  # Assuming placed_tiles contains (tile, position) pairs
+        if pos in placed_positions:
+            curr_node = board.get_node(pos[0], pos[1])
+            
+            if tile == "#":  # Blank tile
+                used_tile = Tile("#", LETTER_VALUES)
+                curr_node.place_blank(used_tile, placed_positions[pos])
+            else:
+                used_tile = Tile(tile, LETTER_VALUES)
+                curr_node.place_tile(used_tile)
+                
+def update_player_after_move_fast(player, bag, placed_tiles, move_score):
+    """
+    Update the player's rack and score after making a move.
+    Optimized version that modifies the player and bag in-place.
+    
+    Args:
+        player: Player object to update
+        bag: Bag object to draw from
+        placed_tiles: List of tiles placed on the board
+        move_score: Score from the move
+    """
+    # Remove placed tiles from rack
+    for tile_info in placed_tiles:
+        tile = tile_info[0]  # Assuming placed_tiles contains (tile, position) pairs
+        if tile in player.rack.rack:
+            player.rack.remove(tile)
+    
+    # Draw new tiles if available
+    while len(player.rack.rack) < 7 and len(bag.tiles) > 0:
+        drawn_tile = bag.draw_tile()
+        if drawn_tile:
+            player.rack.add(drawn_tile)
+    
+    # Update score
+    player.score += move_score
